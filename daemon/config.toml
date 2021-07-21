@@ -1,0 +1,37 @@
+[development_server]
+host = "localhost"
+port = 8080
+
+[app]
+secret = "WJh'pM&'C3aGlFDO7SVQl,pOA?,can"
+programs_dir = "programs"
+minification = true
+
+[default_admin]
+username = "henderson"
+password = "rollwiththechanges"
+
+[database]
+uri = "mysql+pymysql://app:jySb&wfnX7W25#AcR2srNYd9P!eK9iXx@192.168.0.18:3306/ledscreen"
+
+[sandbox]
+run_dir = "run"
+storage_dir = "storage"
+envs_dir = "environments"
+user_id = 1100
+group_id = 1100
+entrypoint = "main.py"
+
+[screen]
+width = 54
+height = 36
+max_brightness = 128
+frequency = 800000
+dma_channel = 10
+gpio_pin = 18
+gpio_channel = 0
+inverted = false
+
+[ipc]
+rx = "tcp://*:7888"
+tx = "tcp://localhost:7889"

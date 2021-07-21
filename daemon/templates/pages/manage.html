@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
+    <script src="/static/js/jquery.min.js"></script>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body {
+            background-color: #eee;
+        }
+        .user-code {
+            font-family: monospace;
+            font-size: 1.1rem;
+            font-weight: bolder;
+        }
+        .btn-icon-combo {
+            margin-right: 5px;
+        }
+        .card-panel {
+            background-color: transparent;
+            border: 0;
+        }
+        .card-panel.card-header {
+            background-color: transparent;
+            border: 0;
+            font-size: 2rem;
+            font-weight: lighter;
+            color: #555;
+        }
+        .card-panel.card-body {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+        }
+        .stat-box:hover {
+            background-color: #dfdfdf;
+            cursor: pointer;
+        }
+        .stat-box {
+            border: 1px solid #eee;
+            border-radius: 10px;
+            background-color: #fff;
+        }
+        .stat-box .stat-headline {
+            font-size: 4rem;
+            font-weight: lighter;
+        }
+        .stat-box .stat-description {
+            color: #555;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">LED Screen Manager</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                    aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0"></ul>
+                <div class="btn-toolbar d-flex" role="toolbar">
+                    <div class="btn-group me-2">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="defaultDropdown"
+                                data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false">
+                            System
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="defaultDropdown">
+                            <li><a class="dropdown-item link-danger" href="#">Yearly reset</a></li>
+                            <li><a class="dropdown-item link-danger" href="#">Hard reset</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#">Restart</a></li>
+                            <li><a class="dropdown-item" href="#">Shutdown</a></li>
+                        </ul>
+                    </div>
+                    <div class="btn-group me-2">
+                        <a class="btn btn-danger" href="/logout" role="button">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-lg-3"></div>
+            <div class="col-lg-6">
+                <div class="my-3">
+                    <div class="card card-panel">
+                        <div class="card-panel card-header">
+                            My Dashboard
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="row justify-content-center">
+                                {% for name, value in statistics.items() %}
+                                <div class="col-3 my-2">
+                                    <div class="stat-box text-center">
+                                        <div class="stat-headline">{{ value }}</div>
+                                        <div class="stat-description mb-4">{{ name }}</div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% if programs|length > 0 %}
+                    <div class="card card-panel">
+                        <div class="card-panel card-header">
+                            Built-in Programs ({{ programs|length }})
+                        </div>
+                        <div class="card-panel card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <tr>
+                                        <th scope="col">Name</th>
+                                        <th scope="col">Description</th>
+                                        <th scope="col" class="text-end">Actions</th>
+                                    </tr>
+                                    {% for program in programs %}
+                                    <tr>
+                                        <td>{{ program.display_name }}</td>
+                                        <td>{{ program.description or "<i>(None provided)</i>" }}</td>
+                                        <td>
+                                            <div class="btn-group float-end" role="group"
+                                                 aria-label="Program row actions">
+                                                <button type="button" class="btn btn-outline-secondary"
+                                                        title="Program settings">
+                                                    <i class="bi-gear" role="img"
+                                                       aria-label="Program settings"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-primary"
+                                                        title="Set as start-up program">
+                                                    <i class="bi-bookmark-check" role="img"
+                                                       aria-label="Set as start-up program"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-success" title="Start">
+                                                    <i class="bi-play-fill" role="img"
+                                                       aria-label="Start"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="card card-panel">
+                        <div class="card-panel card-header">
+                            Students ({{ students|length }})
+                        </div>
+                        <div class="card-panel card-body">
+                            <div class="my-2">
+                                <div class="btn-group" role="group" aria-label="Student table actions">
+                                    <button type="button" class="btn btn-success" id="add-student">
+                                        <span class="bi-person-plus-fill btn-icon-combo" role="img"></span>
+                                        Add Student
+                                    </button>
+                                </div>
+                                <div class="float-end">
+                                    <button type="button" class="btn btn-outline-primary" title="Upload CSV">
+                                        <i class="bi-upload" role="img"
+                                           aria-label="Upload CSV"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary" title="Download CSV">
+                                        <i class="bi-download" role="img"
+                                           aria-label="Download CSV"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <tr>
+                                        <th scope="col" style="width: 12%;">Code</th>
+                                        <th scope="col">Name</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col" class="text-end">Actions</th>
+                                    </tr>
+                                    {% for student in students %}
+                                    <tr>
+                                        <th scope="row" style="width: 12%;"><span class="user-code">{{ student.uid }}</span></th>
+                                        <td>{{ student.user_name }}</td>
+                                        <td>
+                                            {% if student.locked %}
+                                            <span class="bi-lock-fill" role="img"
+                                                  title="Locked"></span>
+                                            <br/>
+                                            {% else %}
+                                            <span class="bi-unlock-fill" role="img"
+                                                  title="Unlocked"></span>
+                                            <br/>
+                                            {% endif %}
+                                            <small>Online for 23min</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group float-end" role="group"
+                                                 aria-label="Student row actions">
+                                                <button type="button" class="btn btn-outline-secondary"
+                                                        title="User settings">
+                                                    <i class="bi-pencil" role="img"
+                                                       aria-label="User settings"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-primary" title="Workspace">
+                                                    <i class="bi-cpu" role="img"
+                                                       aria-label="Workspace"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-warning" title="Lock">
+                                                    <i class="bi-lock-fill" role="img"
+                                                       aria-label="Lock"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-danger" title="Stop" disabled>
+                                                    <i class="bi-stop-circle" role="img"
+                                                       aria-label="Stop"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3"></div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

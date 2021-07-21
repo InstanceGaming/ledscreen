@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Workspace</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/css/codemirror.min.css"/>
+    <link rel="stylesheet" href="/static/css/darcula.min.css">
+    <script src="/static/js/jquery.min.js"></script>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/codemirror.min.js"></script>
+    <script src="/static/js/python.min.js"></script>
+    <script src="/static/js/workspace.js" defer></script>
+    <style>
+        body {
+            background-color: #222;
+            color: #fff;
+        }
+        #action-bar {
+            padding: 20px;
+        }
+        .CodeMirror {
+            font-size: 14pt;
+        }
+        #last-saved-message {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <noscript>Javascript must be enabled for this page to work.</noscript>
+    <main class="container-fluid">
+        <div id="action-bar">
+            {% if user %}
+            <a href="/logout" class="btn btn-outline-danger">
+                <i class="bi-box-arrow-left" role="img"
+                   aria-label="Logout"></i>
+                Logout
+            </a>
+            {% endif %}
+            <a href="/docs/" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+                <i class="bi-box-arrow-up-right" role="img"
+                   aria-label="Open documentation"></i>
+                Documentation
+            </a>
+
+            <div class="float-end">
+                <span class="d-inline text-end align-middle me-2" id="last-saved-message">Last saved 1 minute ago.</span>
+                <button type="button" class="btn btn-primary">
+                    <i class="bi-save" role="img"
+                       aria-label="Save"></i>
+                    Save
+                </button>
+                <button type="button" class="btn btn-warning">
+                    <i class="bi-exclamation-diamond" role="img"
+                       aria-label="Lint"></i>
+                    Lint
+                </button>
+                <button type="button" class="btn btn-success">
+                    <i class="bi-play-fill" role="img"
+                       aria-label="Run"></i>
+                    Run
+                </button>
+            </div>
+        </div>
+
+        <div class="row" id="textbox-container">
+            <div class="col">
+                <textarea id="editor-area" cols="80" rows="20"></textarea>
+            </div>
+            <div class="col">
+                <textarea id="output-area" cols="80" rows="20"></textarea>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
