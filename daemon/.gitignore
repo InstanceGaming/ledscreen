@@ -3,3 +3,5 @@ env/
 environments/
 storage/
 run/
+playground.py
+config.toml

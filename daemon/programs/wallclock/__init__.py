@@ -1,33 +1,33 @@
 from datetime import datetime as dt
-from pluggram import Option
+from pluggram import Pluggram, Option
 
-__pluggram__ = {
-    'display_name': 'Wall Clock',
-    'description': 'Live digital clock display',
-    'version': '1.0.0',
-    'entrypoint': None,
-    'options': [
+
+class WallClock(Pluggram):
+    DISPLAY_NAME = 'Wall Clock'
+    DESCRIPTION = 'Live digital clock display'
+    VERSION = '1.0.0'
+    OPTIONS = [
         Option('show_seconds', True),
         Option('flash_colon', True),
-        Option('foreground', 0xFFFFFF),
-        Option('background', 0)
+        Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF),
+        Option('background', 0, min=0, max=0xFFFFFF),
+        Option('font_size', 12, min=12, max=64)
     ]
-}
 
-OPTIONS = {}
-SCREEN = None
-FLASHER = True
+    def __init__(self,
+                 screen,
+                 **kwargs):
+        self._show_seconds = kwargs['show_seconds']
+        self._flash_colon = kwargs['flash_colon']
+        self._foreground = kwargs['foreground']
+        self._background = kwargs['background']
+        self._size = kwargs['font_size']
+        self._screen = screen
+        self._flasher = False
 
+        screen.fill(self._background)
 
-def run(options, screen):
-    global OPTIONS, SCREEN
-    OPTIONS = options
-    SCREEN = screen
-    screen.fill(OPTIONS['background'])
-
-
-def tick():
-    global FLASHER
-    message = dt.now().strftime(f'%I{(":" if FLASHER else " ")}%M{("%S" if OPTIONS["show_seconds"] else "")}%p')
-    SCREEN.draw_text(SCREEN.center_index, OPTIONS['foreground'], 12, message, bold=True)
-    FLASHER = not FLASHER
+    def render(self):
+        message = dt.now().strftime(f'%I{(":" if self._flasher else " ")}%M{("%S" if self._show_seconds else "")}%p')
+        self._screen.draw_text(self._screen.center_index, self._foreground, self._size, message, bold=True)
+        self._flasher = not self._flasher

@@ -99,7 +99,7 @@ def create_app():
     config = _load_config(config_path)
     logging.info(f'loaded application config from "{config_path}"')
 
-    progs = load(config['app.programs_dir'])
+    progs = load(config['app.programs_dir'], 1)
 
     app.url_map.strict_slashes = False
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

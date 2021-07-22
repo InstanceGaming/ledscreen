@@ -123,7 +123,12 @@
                                     </tr>
                                     {% for program in programs %}
                                     <tr>
-                                        <td>{{ program.display_name }}</td>
+                                        <td>
+                                            {{ program.display_name }}
+                                            {% if program.version %}
+                                            <small class="fw-lighter">v{{ program.version }}</small>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ program.description or "<i>(None provided)</i>" }}</td>
                                         <td>
                                             <div class="btn-group float-end" role="group"
