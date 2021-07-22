@@ -27,11 +27,12 @@ class Screen:
         return self._w * self._h
 
     @property
-    def center_point(self):
+    def center_point(self) -> Tuple:
         """
         Get the center point of the screen.
 
         :return: A coordinate in the form of a tuple (x, y)
+        :rtype: tuple
         """
         raise NotImplementedError()
 
@@ -45,7 +46,7 @@ class Screen:
 
     def render(self):
         """
-        Draw the pixel color data to the screen.
+        Draw all pixel color data to the screen.
         """
         payload = RenderFrame.encode()
         self._send_data(payload)
@@ -55,8 +56,8 @@ class Screen:
         Change an individual LED to a color.
 
         :param position: apply only to the LED at this position (either x, y coordinates or index)
-        :param color: color integer including all three channels, red, green and blue.
-        :param multiplier: scale all color channels by this mount.
+        :param color: color integer including all three channels, red, green and blue
+        :param multiplier: scale all color channels by this mount
         """
         index = position_to_index(position, self._w, self._h)
         final_color = adjust_color(color, multiplier)
@@ -65,50 +66,41 @@ class Screen:
 
     def draw_text(self,
                   position: Union[Tuple, int],
-                  color: int,
-                  size: int,
                   text: str,
-                  stroke_width=0,
-                  stroke_color=None,
+                  size: int,
+                  color: int,
+                  background=None,
                   bold=False,
-                  italic=False,
-                  underlined=False,
-                  strikethrough=False):
+                  italic=False):
         """
         Draw characters to the screen using the current font.
 
         :param position: apply only to the LED at this position (either x, y coordinates or index)
-        :param color: color integer including all three channels, red, green and blue.
-        :param size: number of pixels to scale the font character.
-        :param text: the sequence of characters to display.
-        :param stroke_width: number of pixels to add around the characters as a outline.
-        :param stroke_color: color of outline.
-        :param bold: use bolded character set.
-        :param italic: use italicized character set.
-        :param underlined: draw a line under the text.
-        :param strikethrough: draw a line through the center of the text.
+        :param color: color integer including all three channels, red, green and blue
+        :param background: background color where :class:`None` is transparent
+        :param size: number of pixels to scale the font character
+        :param text: the sequence of characters to display
+        :param bold: use bolded character set
+        :param italic: use italicized character set
         """
         index = position_to_index(position, self._w, self._h)
         message = fix_text(text)
         check_font_size(size)
         payload = DrawTextFrame.encode(index,
                                        color,
+                                       background,
                                        size,
                                        message,
-                                       stroke_width=stroke_width,
-                                       stroke_color=stroke_color,
                                        bold=bold,
-                                       italic=italic,
-                                       underlined=underlined,
-                                       strikethrough=strikethrough)
+                                       italic=italic)
         self._send_data(payload)
 
     def fill(self, color: int, multiplier=1):
         """
         Uniformly fill the screen with a particular color.
 
-        :param color: color integer including all three channels, red, green and blue.
-        :param multiplier: scale all color channels by this mount.
+        :param color: color integer including all three channels, red, green and blue
+        :param multiplier: scale all color channels by this mount
         """
         final_color = adjust_color(color, multiplier)
         payload = FillFrame.encode(final_color)

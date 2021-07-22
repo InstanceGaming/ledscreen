@@ -1,5 +1,3 @@
 @echo off
-del docs\source\ledscreen.rst
-del docs\source\modules.rst
-.\env\Scripts\sphinx-apidoc.exe -o docs\source\ ledscreen
+.\env\Scripts\sphinx-apidoc.exe -f -e -M -o docs\source\ ledscreen ledscreen\ipc_common.py
 .\docs\make.bat html

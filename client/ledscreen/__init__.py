@@ -24,7 +24,10 @@ def _parse_args():
 def get_screen() -> Screen:
     """
     Get the Screen object from the system.
-    :return: a Screen instance
+
+    :return: the :class:`Screen` instance
+    :rtype: Screen
+    :raises RuntimeError: if there was a problem connecting to the screen
     """
     global _SCREEN_CACHE
 
