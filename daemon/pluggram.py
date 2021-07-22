@@ -6,7 +6,6 @@ import abc
 import inspect
 from inspect import Parameter
 from enum import IntEnum
-from api import Screen
 
 
 class ProgramStatus(IntEnum):
@@ -206,10 +205,6 @@ class Pluggram(abc.ABC):
         pass
 
 
-def _has_function(mod, name):
-    return name in dir(mod) and callable(getattr(mod, name, None))
-
-
 def load(programs_dir: str, argument_count):
     if not os.path.isdir(programs_dir):
         raise RuntimeError('Programs directory does not exist or is not a directory')
@@ -308,67 +303,5 @@ def load(programs_dir: str, argument_count):
                                                            options=option_definitions))
 
                         logging.info(f'loaded pluggram {module_name}.{class_name} ("{module_path}")')
-
-                        # if hasattr(m, '__pluggram__'):
-                        #     metadata = m.__pluggram__
-                        #
-                        #     display_name = metadata.get('display_name')
-                        #     description = metadata.get('description')
-                        #     version = metadata.get('version')
-                        #     entrypoint = metadata.get('entrypoint')
-                        #     options = metadata.get('options')
-                        #
-                        #     if entrypoint is not None:
-                        #         entrypoint_path = os.path.join(module_path, entrypoint)
-                        #
-                        #         if not os.path.isfile(entrypoint_path):
-                        #             logging.debug(f'disqualifying module {module_name}: entrypoint does not exist')
-                        #             continue
-                        #     else:
-                        #         entrypoint = init_path
-                        #
-                        #     if display_name is None or options is None:
-                        #         logging.debug(f'disqualifying module {module_name}: incomplete "__pluggram__" dict')
-                        #         continue
-                        #
-                        #     if not isinstance(options, list):
-                        #         logging.debug(
-                        #             f'disqualifying module {module_name}: metadata options must be a list type')
-                        #         continue
-                        #     else:
-                        #         for option in options:
-                        #             if not isinstance(option, Option):
-                        #                 logging.debug(f'disqualifying module {module_name}: metadata option must be of '
-                        #                               f'pluggram.Option type')
-                        #                 continue
-                        #
-                        #     if not _has_function(m, 'run'):
-                        #         logging.debug(f'disqualifying module {module_name}: does not define run()')
-                        #         continue
-                        #     else:
-                        #         run_parameters = signature(m.run).parameters
-                        #
-                        #         if len(run_parameters) < 1:
-                        #             logging.debug(f'disqualifying module {module_name}: '
-                        #                           'run() signature needs at least one argument (to pass options)')
-                        #             continue
-                        #
-                        #     if not _has_function(m, 'tick'):
-                        #         logging.debug(f'disqualifying module {module_name}: does not define tick()')
-                        #         continue
-                        #
-                        #     program = PluggramMeta(m,
-                        #                            module_path,
-                        #                            run_parameters,
-                        #                            module_name,
-                        #                            display_name,
-                        #                            description,
-                        #                            version,
-                        #                            entrypoint,
-                        #                            options)
-                        #     pluggrams.append(program)
-                        #     logging.info(f'loaded module {module_name} ("{module_path}")')
-                        # else:
-                        #     logging.debug(f'disqualifying module {module_name}: does not define "__pluggram__"')
 
     return pluggram_metas

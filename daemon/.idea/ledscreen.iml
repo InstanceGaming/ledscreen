@@ -13,4 +13,10 @@
     <orderEntry type="jdk" jdkName="Python 3.9 (daemon)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
+  <component name="PyDocumentationSettings">
+    <option name="renderExternalDocumentation" value="true" />
+  </component>
+  <component name="ReSTService">
+    <option name="DOC_DIR" value="docs/" />
+  </component>
 </module>

@@ -1,7 +1,7 @@
 **/__pycache__
-env/
-environments/
-storage/
-run/
+env/**
+environments/**
+storage/**
+run/**
 playground.py
 config.toml

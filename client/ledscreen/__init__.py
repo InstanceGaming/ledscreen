@@ -12,7 +12,7 @@ __author__ = "Jacob Jewett"
 _SCREEN_CACHE = None
 
 
-def parse_args():
+def _parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument('--screen-host', type=str, dest='screen_host', required=True)
     ap.add_argument('--tx-port', type=int, dest='screen_tx', required=True)
@@ -22,10 +22,14 @@ def parse_args():
 
 
 def get_screen() -> Screen:
+    """
+    Get the Screen object from the system.
+    :return: a Screen instance
+    """
     global _SCREEN_CACHE
 
     if _SCREEN_CACHE is None:
-        cla = parse_args()
+        cla = _parse_args()
         host = cla.screen_host
         tx_uri = f'tcp://{host}:{cla.screen_tx}'
         rx_uri = f'tcp://*:{cla.screen_rx}'

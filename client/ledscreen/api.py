@@ -30,6 +30,7 @@ class Screen:
     def center_point(self):
         """
         Get the center point of the screen.
+
         :return: A coordinate in the form of a tuple (x, y)
         """
         raise NotImplementedError()
@@ -52,6 +53,7 @@ class Screen:
     def set_pixel(self, position: Union[Tuple, int], color: int, multiplier=1):
         """
         Change an individual LED to a color.
+
         :param position: apply only to the LED at this position (either x, y coordinates or index)
         :param color: color integer including all three channels, red, green and blue.
         :param multiplier: scale all color channels by this mount.
@@ -74,6 +76,7 @@ class Screen:
                   strikethrough=False):
         """
         Draw characters to the screen using the current font.
+
         :param position: apply only to the LED at this position (either x, y coordinates or index)
         :param color: color integer including all three channels, red, green and blue.
         :param size: number of pixels to scale the font character.
@@ -103,6 +106,7 @@ class Screen:
     def fill(self, color: int, multiplier=1):
         """
         Uniformly fill the screen with a particular color.
+
         :param color: color integer including all three channels, red, green and blue.
         :param multiplier: scale all color channels by this mount.
         """

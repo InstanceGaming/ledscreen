@@ -6,7 +6,29 @@ MAX_COLORS = 16777215
 
 
 def timing_counter():
+    """
+    Monotonic, high-precision system counter.
+    :return: an integer value relative only to itself.
+    """
     return time.perf_counter() * 1000
+
+
+def text_dimensions(message: str, size: int, bold=False, italic=False) -> Tuple[int, int]:
+    """
+    Get the dimensions of a message as shown on the screen.
+
+    :param message: a string that comprises your desired message.
+    :param size: font size in pixels.
+    :param bold: calculate the font with bolded weight.
+    :param italic: calculate the font with italicized characters.
+    :return: a tuple containing the (x, y) size of the message.
+    """
+    message = fix_text(message)
+    size = check_font_size(size)
+    w = 0
+    h = 0
+    # todo
+    return w, h
 
 
 def fix_text(message, encoding='UTF-8'):
@@ -14,15 +36,6 @@ def fix_text(message, encoding='UTF-8'):
         return message
     else:
         return str(message, encoding)
-
-
-def text_dimensions(message: str, size: int, bold=False, italic=False) -> Tuple[int, int]:
-    message = fix_text(message)
-    size = check_font_size(size)
-    w = 0
-    h = 0
-    # todo
-    return w, h
 
 
 def normalize_color(color: int) -> int:
