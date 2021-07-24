@@ -1,11 +1,90 @@
 import subprocess
 import threading
-from typing import Tuple, Union, NoReturn, Callable
 import time
 import random
+import os
+import pytoml
+import logging
+from dotted.collection import DottedDict
+from typing import Tuple, Union, NoReturn, Callable
 
 
 MAX_COLORS = 16777215
+
+
+def get_config_path():
+    return os.environ.get('LS_CONFIG')
+
+
+def _config_node_or_exit(config: DottedDict, key: str):
+    value = config.get(key)
+    if value is None:
+        logging.error(f'"{key}" path must be defined in config')
+        exit(3)
+    return value
+
+
+def load_config():
+    config_path = get_config_path()
+
+    if config_path is None:
+        logging.error('LS_CONFIG environment variable is not set')
+        exit(20)
+
+    config = None
+
+    if os.path.isfile(config_path):
+        try:
+            with open(config_path, 'r') as cf:
+                config = DottedDict(pytoml.load(cf))
+        except OSError as e:
+            logging.error(f'open("{config_path}") failed: {str(e)}')
+            exit(1)
+        except pytoml.TomlError as e:
+            logging.error(f'config parse failed: {str(e)}')
+            exit(2)
+    else:
+        logging.error(f'config missing at "{config_path}"')
+        exit(1)
+
+    _config_node_or_exit(config, 'development_server')
+    _config_node_or_exit(config, 'development_server.host')
+    _config_node_or_exit(config, 'development_server.port')
+
+    _config_node_or_exit(config, 'app')
+    _config_node_or_exit(config, 'app.secret')
+    _config_node_or_exit(config, 'app.programs_dir')
+    _config_node_or_exit(config, 'app.minification')
+
+    _config_node_or_exit(config, 'default_admin')
+    _config_node_or_exit(config, 'default_admin.username')
+    _config_node_or_exit(config, 'default_admin.password')
+
+    _config_node_or_exit(config, 'sandbox')
+    _config_node_or_exit(config, 'sandbox.run_dir')
+    _config_node_or_exit(config, 'sandbox.storage_dir')
+    _config_node_or_exit(config, 'sandbox.envs_dir')
+    _config_node_or_exit(config, 'sandbox.user_id')
+    _config_node_or_exit(config, 'sandbox.group_id')
+    _config_node_or_exit(config, 'sandbox.entrypoint')
+
+    _config_node_or_exit(config, 'database')
+    _config_node_or_exit(config, 'database.uri')
+    _config_node_or_exit(config, 'screen')
+    _config_node_or_exit(config, 'screen.width')
+    _config_node_or_exit(config, 'screen.height')
+    _config_node_or_exit(config, 'screen.max_brightness')
+    _config_node_or_exit(config, 'screen.frequency')
+    _config_node_or_exit(config, 'screen.dma_channel')
+    _config_node_or_exit(config, 'screen.gpio_pin')
+    _config_node_or_exit(config, 'screen.gpio_channel')
+    _config_node_or_exit(config, 'screen.inverted')
+
+    _config_node_or_exit(config, 'ipc')
+    _config_node_or_exit(config, 'ipc.rx')
+    _config_node_or_exit(config, 'ipc.tx')
+
+    return config
 
 
 def enum_name_or_null(e):

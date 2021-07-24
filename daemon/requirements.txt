@@ -1,5 +1,4 @@
 flask
-flask-sqlalchemy
 flask-restful
 flask-limiter
 flask-minify
@@ -7,6 +6,6 @@ pymysql
 zmq
 pytoml
 dotted
-cryptography
 sqlalchemy
 werkzeug
+dateparser

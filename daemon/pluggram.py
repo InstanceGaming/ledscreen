@@ -8,12 +8,6 @@ from inspect import Parameter
 from enum import IntEnum
 
 
-class ProgramStatus(IntEnum):
-    OFF = 0
-    RUNNING = 1
-    OVERRIDDEN = 2
-
-
 class Option:
     SUPPORTED_TYPES = [int, str, bool]
 
@@ -124,7 +118,7 @@ class PluggramMeta:
     @property
     def display_name(self):
         return self._display_name
-    
+
     @property
     def version(self):
         return self._version
@@ -134,16 +128,17 @@ class PluggramMeta:
         return self._description
 
     @property
-    def status(self):
-        return self._status
-
-    @property
     def options(self):
         return self._options
+
+    @property
+    def running(self):
+        return self._instance is not None
 
     def __init__(self,
                  module,
                  module_path: str,
+                 entry_class: type,
                  name: str,
                  display_name: str,
                  description: str,
@@ -152,13 +147,14 @@ class PluggramMeta:
                  options=None):
         self._module = module
         self._path = module_path
+        self._entry_class = entry_class
         self._name = name
         self._display_name = display_name
         self._description = description
         self._version = version
         self._positional_count = positional_count
         self._options = options or []
-        self._status = ProgramStatus.OFF
+        self._instance = None
 
     def init(self, *args, **kwargs):
         if len(args) < self._positional_count:
@@ -178,24 +174,14 @@ class PluggramMeta:
             else:
                 raise RuntimeError(f'Unknown option "{key}"')
 
-        self._status = ProgramStatus.RUNNING
-        self._module.run(self._option_values, *args, **kwargs)
-
-    def override(self, active: bool):
-        if self._status == ProgramStatus.OFF:
-            raise RuntimeError('Cannot override program that is off')
-
-        self._status = ProgramStatus.OVERRIDDEN if active else self._status
+        self._instance = self._entry_class(*args, **kwargs)
+        self._instance.tick()
 
     def tick(self):
-        if self._status == ProgramStatus.OFF:
+        if self._instance is None:
             raise RuntimeError('Not initialized, did you call init()?')
 
-        if self._status != ProgramStatus.OVERRIDDEN:
-            self._module.tick()
-
-    def stop(self):
-        self._status = ProgramStatus.OFF
+        self._instance.tick()
 
 
 class Pluggram(abc.ABC):
@@ -228,7 +214,7 @@ def load(programs_dir: str, argument_count):
                         except Exception as e:
                             message = f'disqualifying module {module_name}: exception raised in "{file}":\n'
                             message += ''.join(tb.format_exception(None, e, e.__traceback__))
-                            logging.info(message)
+                            logging.warning(message)
                             continue
 
                         # 1. get class definitions in module to find entrypoint
@@ -244,16 +230,14 @@ def load(programs_dir: str, argument_count):
                                 break
 
                         if pluggram_module_class is None:
-                            logging.debug(f'disqualifying module {module_name}: '
-                                          'module does not define a class inheriting Pluggram')
+                            logging.warning(f'disqualifying module {module_name}: '
+                                            'module does not define a class inheriting Pluggram')
                             continue
-
-                        class_name = type(pluggram_module_class).__name__
 
                         # 3. ensure the class has a constructor
                         if not hasattr(pluggram_module_class, '__init__'):
-                            logging.debug(f'disqualifying {module_name}.{class_name}: '
-                                          'does not define a constructor')
+                            logging.warning(f'disqualifying {module_name}.{class_name}: '
+                                            'does not define a constructor')
                             continue
 
                         # 4. note argument count
@@ -266,9 +250,9 @@ def load(programs_dir: str, argument_count):
                                     positional_count += 1
 
                         if positional_count > argument_count:
-                            logging.debug(f'disqualifying {module_name}.{class_name}: '
-                                          f'constructor positional arguments mismatch ({positional_count} wanted, '
-                                          f'{argument_count} exist)')
+                            logging.warning(f'disqualifying {module_name}.{class_name}: '
+                                            f'constructor positional arguments mismatch ({positional_count} wanted, '
+                                            f'{argument_count} exist)')
                             continue
 
                         # 5. collect metadata
@@ -289,12 +273,13 @@ def load(programs_dir: str, argument_count):
                             if isinstance(pluggram_module_class.OPTIONS, list):
                                 option_definitions = pluggram_module_class.OPTIONS
                             else:
-                                logging.debug(f'disqualifying {module_name}.{class_name}: '
-                                              f'"OPTIONS" property is not a list')
+                                logging.warning(f'disqualifying {module_name}.{class_name}: '
+                                                f'"OPTIONS" property is not a list')
                                 continue
 
                         pluggram_metas.append(PluggramMeta(loaded_module,
                                                            module_path,
+                                                           type(pluggram_module_class),
                                                            module_name,
                                                            display_name,
                                                            description,

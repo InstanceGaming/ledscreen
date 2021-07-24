@@ -182,15 +182,12 @@ class DrawTextFrame:
 
     @staticmethod
     def encode(index: int,
-               color: int,
-               size: int,
                text: str,
-               stroke_width=0,
-               stroke_color=None,
+               color: int,
+               background,
+               size: int,
                bold=False,
-               italic=False,
-               underlined=False,
-               strikethrough=False) -> bytes:
+               italic=False) -> bytes:
         raise NotImplementedError()
 
 

@@ -19,7 +19,7 @@ def get_context(rx_uri, tx_uri):
         zmq_txs.connect(tx_uri)
     except zmq.ZMQError as e:
         logging.error(f'IPC bind error: {str(e)}')
-        exit(20)
+        exit(30)
 
 
 def ipc_server(exit_event: threading.Event(), screen: api.Screen, rx, tx, receive_timeout: int):

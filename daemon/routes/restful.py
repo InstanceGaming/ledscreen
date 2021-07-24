@@ -1,11 +1,14 @@
 from flask import Blueprint, request
 from flask_restful import Api, Resource
-from models import User, RunTarget, UserType, Workspace
 from common import LIMITER, CONFIG
 from .authentication import auth_endpoint_allowed
 from utils import enum_name_or_null, isoformat_or_null
+from models import (User,
+                    RunTarget,
+                    UserType,
+                    Workspace)
 import system
-import logging
+
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 api = Api(bp)

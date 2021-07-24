@@ -1,27 +1,23 @@
 from datetime import datetime as dt
 from typing import Union
-from flask_sqlalchemy import SQLAlchemy
 from utils import generate_sanitized_alphanumerics, generate_url_binary
-from sqlalchemy import func
+from sqlalchemy import (Column,
+                        ForeignKey,
+                        Integer,
+                        String,
+                        DateTime,
+                        Enum,
+                        UnicodeText,
+                        Unicode,
+                        func)
+from database import Base, session
 import enum
 import logging
 
-db = SQLAlchemy()
+
 SESSION_TOKEN_LENGTH = 64
 WORKSPACE_TOKEN_LENGTH = 32
 USER_TOKEN_LENGTH = 8
-
-
-def create_all_tables(app):
-    global db
-    db.init_app(app)
-    with app.app_context():
-        db.create_all()
-
-
-def init(app):
-    global db
-    db.init_app(app)
 
 
 class UserType(enum.IntEnum):
@@ -30,23 +26,23 @@ class UserType(enum.IntEnum):
     SYSTEM = 3
 
 
-class User(db.Model):
+class User(Base):
     __tablename__ = 'users'
 
     @property
     def locked(self):
         return self.locked_at is not None
 
-    uid = db.Column(db.String(8), primary_key=True)
-    issued_at = db.Column(db.DateTime(), nullable=False)
-    type = db.Column(db.Enum(UserType), nullable=False)
-    user_name = db.Column(db.Unicode(40), nullable=False)
-    expires_at = db.Column(db.DateTime(), nullable=True)
-    locked_at = db.Column(db.DateTime(), nullable=True)
-    password = db.Column(db.Unicode(64), nullable=True)
-    login_at = db.Column(db.DateTime(), nullable=True)
-    logout_at = db.Column(db.DateTime(), nullable=True)
-    admin_comment = db.Column(db.UnicodeText(), nullable=True)
+    uid = Column(String(8), primary_key=True)
+    issued_at = Column(DateTime(), nullable=False)
+    type = Column(Enum(UserType), nullable=False)
+    user_name = Column(Unicode(40), nullable=False)
+    expires_at = Column(DateTime(), nullable=True)
+    locked_at = Column(DateTime(), nullable=True)
+    password = Column(Unicode(64), nullable=True)
+    login_at = Column(DateTime(), nullable=True)
+    logout_at = Column(DateTime(), nullable=True)
+    admin_comment = Column(UnicodeText(), nullable=True)
 
     def __init__(self,
                  uid: str,
@@ -72,15 +68,15 @@ class User(db.Model):
         return f'<User {self.uid} name="{self.user_name}" type={self.type.name}>'
 
 
-class Session(db.Model):
+class Session(Base):
     __tablename__ = 'sessions'
-    sid = db.Column(db.String(64), primary_key=True)
-    issued_at = db.Column(db.DateTime(), nullable=False)
-    expires_at = db.Column(db.DateTime(), nullable=False)
+    sid = Column(String(64), primary_key=True)
+    issued_at = Column(DateTime(), nullable=False)
+    expires_at = Column(DateTime(), nullable=False)
 
-    owner = db.Column(db.String(8),
-                      db.ForeignKey('users.uid', onupdate="CASCADE", ondelete="CASCADE"),
-                      nullable=False)
+    owner = Column(String(8),
+                   ForeignKey('users.uid', onupdate="CASCADE", ondelete="CASCADE"),
+                   nullable=False)
 
     def __init__(self,
                  sid: str,
@@ -110,29 +106,29 @@ class RunStatus(enum.IntEnum):
     STOPPING = 2
 
 
-class Workspace(db.Model):
+class Workspace(Base):
     __tablename__ = 'workspaces'
 
     @property
     def short_wid(self):
         return self.wid[:16]
 
-    wid = db.Column(db.String(32), primary_key=True)
-    created_at = db.Column(db.DateTime(), nullable=False)
-    env_path = db.Column(db.UnicodeText(), nullable=False)
-    storage_path = db.Column(db.UnicodeText(), nullable=False)
-    run_dir = db.Column(db.UnicodeText(), nullable=False)
-    interpreter_path = db.Column(db.UnicodeText(), nullable=False)
-    py_file = db.Column(db.UnicodeText(), nullable=False)
-    run_privilege = db.Column(db.Enum(RunTarget), nullable=True)
-    max_runtime = db.Column(db.Integer(), nullable=True)
-    run_target = db.Column(db.Enum(RunTarget), nullable=True)
-    run_status = db.Column(db.Enum(RunStatus), nullable=False, server_default=RunStatus.IDLE.name)
-    opened_at = db.Column(db.DateTime(), nullable=True)
+    wid = Column(String(32), primary_key=True)
+    created_at = Column(DateTime(), nullable=False)
+    env_path = Column(UnicodeText(), nullable=False)
+    storage_path = Column(UnicodeText(), nullable=False)
+    run_dir = Column(UnicodeText(), nullable=False)
+    interpreter_path = Column(UnicodeText(), nullable=False)
+    py_file = Column(UnicodeText(), nullable=False)
+    run_privilege = Column(Enum(RunTarget), nullable=True)
+    max_runtime = Column(Integer(), nullable=True)
+    run_target = Column(Enum(RunTarget), nullable=True)
+    run_status = Column(Enum(RunStatus), nullable=False, server_default=RunStatus.IDLE.name)
+    opened_at = Column(DateTime(), nullable=True)
 
-    owner = db.Column(db.String(8),
-                      db.ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
-                      nullable=True)
+    owner = Column(String(8),
+                   ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
+                   nullable=True)
 
     def __init__(self,
                  wid: str,
@@ -169,29 +165,29 @@ class ExitReason(enum.IntEnum):
     TIMEOUT = 3
 
 
-class RunLog(db.Model):
+class RunLog(Base):
     __tablename__ = 'run_log'
 
     @property
     def short_rid(self):
         return self.rid[:16]
 
-    rid = db.Column(db.String(64), primary_key=True)
-    started_at = db.Column(db.DateTime(), nullable=False)
-    stopped_at = db.Column(db.DateTime(), nullable=True)
-    return_code = db.Column(db.Integer(), nullable=True)
-    std_out = db.Column(db.UnicodeText(), nullable=True)
-    std_error = db.Column(db.UnicodeText(), nullable=True)
-    exit_reason = db.Column(db.Enum(ExitReason), nullable=True)
-    interpreter_path = db.Column(db.UnicodeText(), nullable=False)
-    run_path = db.Column(db.UnicodeText(), nullable=False)
+    rid = Column(String(64), primary_key=True)
+    started_at = Column(DateTime(), nullable=False)
+    stopped_at = Column(DateTime(), nullable=True)
+    return_code = Column(Integer(), nullable=True)
+    std_out = Column(UnicodeText(), nullable=True)
+    std_error = Column(UnicodeText(), nullable=True)
+    exit_reason = Column(Enum(ExitReason), nullable=True)
+    interpreter_path = Column(UnicodeText(), nullable=False)
+    run_path = Column(UnicodeText(), nullable=False)
 
-    owner = db.Column(db.String(8),
-                      db.ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
-                      nullable=True)
-    workspace = db.Column(db.String(32),
-                          db.ForeignKey('workspaces.wid', onupdate="CASCADE", ondelete="SET NULL"),
-                          nullable=True)
+    owner = Column(String(8),
+                   ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
+                   nullable=True)
+    workspace = Column(String(32),
+                       ForeignKey('workspaces.wid', onupdate="CASCADE", ondelete="SET NULL"),
+                       nullable=True)
 
     def __init__(self,
                  rid: str,
@@ -219,7 +215,8 @@ def lookup_sid_cs(input_sid: str) -> Union[None, Session]:
     :param input_sid: proposed session ID code
     :return: Session instance or None
     """
-    return Session.query.filter(Session.sid == func.binary(input_sid)).first()
+    with session.begin():
+        return Session.query.filter(Session.sid == func.binary(input_sid)).first()
 
 
 def generate_session_token_safe():
@@ -235,9 +232,10 @@ def generate_session_token_safe():
 def generate_workspace_token_safe():
     result = generate_url_binary(WORKSPACE_TOKEN_LENGTH)
 
-    if lookup_wid_cs(result) is not None:
-        logging.info('one in a zillion just happened!')
-        return generate_workspace_token_safe()
+    with session.begin():
+        if Workspace.query.get(result) is not None:
+            logging.info('one in a zillion just happened!')
+            return generate_workspace_token_safe()
 
     return result
 
@@ -245,8 +243,9 @@ def generate_workspace_token_safe():
 def generate_user_token_safe():
     result = generate_sanitized_alphanumerics(USER_TOKEN_LENGTH, lowercase=False)
 
-    if User.query.get(result) is not None:
-        logging.info('one in a zillion just happened!')
-        return generate_user_token_safe()
+    with session.begin():
+        if User.query.get(result) is not None:
+            logging.info('one in a zillion just happened!')
+            return generate_user_token_safe()
 
     return result

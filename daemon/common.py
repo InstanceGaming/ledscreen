@@ -2,22 +2,16 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 
-def _true():
-    return True
-
-
-# noinspection PyTypeChecker
-LIMITER = Limiter(key_func=get_remote_address, default_limits_exempt_when=_true)
-
+LIMITER = Limiter(key_func=get_remote_address)
 CONFIG = {}
 PROGRAMS = []
 
 
-def init(app, config, progs):
+def init(app, config, programs):
     global LIMITER, CONFIG, PROGRAMS
     LIMITER.init_app(app)
     CONFIG = config
-    PROGRAMS = progs
+    PROGRAMS = programs
 
 
 LOGIN_PAGE = 'auth.login'
@@ -26,3 +20,7 @@ MANAGEMENT_PAGE = 'manage.index'
 MANAGEMENT_TEMPLATE = 'pages/manage.html'
 USER_WORKSPACE_PAGE = 'workspaces.workspace'
 USER_WORKSPACE_TEMPLATE = 'pages/workspace.html'
+SETUP_PAGE = 'oobe.setup'
+SETUP_TEMPLATE = 'pages/setup.html'
+WELCOME_PAGE = 'oobe.welcome'
+WELCOME_TEMPLATE = 'pages/welcome.html'

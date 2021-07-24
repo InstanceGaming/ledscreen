@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <script src="/static/js/jquery.min.js"></script>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <style>
+        #workspace-code-field {
+            text-transform: uppercase;
+        }
+        .form-box {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            margin: 10% auto;
+        }
+        body {
+            background-color: #eee;
+        }
+    </style>
+</head>
+<body class="text-center">
+    <main class="form-box">
+        {% if completed %}
+        <div class="mb-3">
+            <h1><code>{{ uid }}</code></h1>
+        </div>
+        <p class="lead">Your account has been created. You must keep the 8-digit code above to login from this point forward.</p>
+        <div class="d-grid gap-2">
+            <a type="button" class="btn btn-outline-primary btn-lg" href="{{ url_for('manage.index') }}">Go to
+                management dashboard</a>
+        </div>
+        {% else %}
+        <form action="" method="POST" name="login-form">
+            <fieldset>
+                <div class="mb-3">
+                    <h1>Setup</h1>
+                </div>
+                {% if mid %}
+                <div class="mb-3">
+                    {% if mid == 1 %}
+                    <div class="alert alert-danger" role="alert">
+                        Previous password incorrect.
+                    </div>
+                    {% endif %}
+                    {% if mid == 2 %}
+                    <div class="alert alert-danger" role="alert">
+                        Username must be between 1 and 40 characters long.
+                    </div>
+                    {% endif %}
+                    {% if mid == 3 %}
+                    <div class="alert alert-danger" role="alert">
+                        Password confirmation does not match.
+                    </div>
+                    {% endif %}
+                    {% if mid == 4 %}
+                    <div class="alert alert-danger" role="alert">
+                        All fields are required.
+                    </div>
+                    {% endif %}
+                    {% if mid == 5 %}
+                    <div class="alert alert-danger" role="alert">
+                        Password must be between 6 and 64 characters long.
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if previous %}
+                <div class="form-floating mb-3">
+                    <input type="password" spellcheck="false" maxlength="64" minlength="6"
+                           name="previous-password"
+                           id="previous-password-field" class="form-control">
+                    <label for="previous-password-field">Previous Password</label>
+                </div>
+                {% endif %}
+                <div class="form-floating mb-3">
+                    <input type="text" spellcheck="false" maxlength="64" minlength="6"
+                           name="username"
+                           id="username-field" class="form-control">
+                    <label for="username-field">Username</label>
+                </div>
+                <div class="form-floating mb-3">
+                    <input type="password" spellcheck="false" maxlength="64" minlength="6"
+                           name="password"
+                           id="password-field" class="form-control">
+                    <label for="password-field">New Password</label>
+                </div>
+                <div class="form-floating mb-3">
+                    <input type="password" spellcheck="false" maxlength="64" minlength="6"
+                           name="confirm-password"
+                           id="confirm-password-field" class="form-control">
+                    <label for="confirm-password-field">Confirm Password</label>
+                </div>
+                <div class="my-3">
+                    <div class="d-grid gap-2" id="actions">
+                        <button type="submit" class="btn btn-outline-primary btn-lg" id="form-submit">Submit</button>
+                    </div>
+                </div>
+            </fieldset>
+        </form>
+        {% endif %}
+    </main>
+    <script>
+        /*Globally enable tooltips*/
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    </script>
+</body>
+</html>
