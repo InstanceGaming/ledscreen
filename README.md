@@ -33,8 +33,8 @@ When the student has written and syntax-checked their code, within two clicks, t
 
 - Make a virtual environment and activate it
 - Run `pip install -r requirements.txt`
-- Setup a MySQL or MariaDB instance
-- Create `config.toml` with a structure as scrutinized in `app.py:_load_config()`
+- Setup a MySQL or MariaDB instance and a dedicated database user
+- Create `config.toml` (see `utils.py:load_config()`)
 - Set the `LS_CONFIG` environment variable with a path to the `config.toml` file
-- Run `python app.py --setup-db` to initialize database tables
+- Run `python cli.py setup-db` to initialize database
 - Run `python app.py`
