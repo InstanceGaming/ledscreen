@@ -8,6 +8,9 @@ from inspect import Parameter
 from enum import IntEnum
 
 
+LOG = logging.getLogger('ledscreen.pluggram')
+
+
 class Option:
     SUPPORTED_TYPES = [int, str, bool]
 
@@ -204,7 +207,7 @@ def load(programs_dir: str, argument_count):
                 for file in os.listdir(module_path):
                     if file == '__init__.py':
                         init_path = os.path.join(module_path, file)
-                        logging.debug(f'found module {module_name} ("{module_path}")')
+                        LOG.debug(f'found module {module_name} ("{module_path}")')
 
                         spec = importlib.util.spec_from_file_location(module_name, init_path)
                         loaded_module = importlib.util.module_from_spec(spec)
@@ -214,7 +217,7 @@ def load(programs_dir: str, argument_count):
                         except Exception as e:
                             message = f'disqualifying module {module_name}: exception raised in "{file}":\n'
                             message += ''.join(tb.format_exception(None, e, e.__traceback__))
-                            logging.warning(message)
+                            LOG.warning(message)
                             continue
 
                         # 1. get class definitions in module to find entrypoint
@@ -230,13 +233,13 @@ def load(programs_dir: str, argument_count):
                                 break
 
                         if pluggram_module_class is None:
-                            logging.warning(f'disqualifying module {module_name}: '
+                            LOG.warning(f'disqualifying module {module_name}: '
                                             'module does not define a class inheriting Pluggram')
                             continue
 
                         # 3. ensure the class has a constructor
                         if not hasattr(pluggram_module_class, '__init__'):
-                            logging.warning(f'disqualifying {module_name}.{class_name}: '
+                            LOG.warning(f'disqualifying {module_name}.{class_name}: '
                                             'does not define a constructor')
                             continue
 
@@ -250,7 +253,7 @@ def load(programs_dir: str, argument_count):
                                     positional_count += 1
 
                         if positional_count > argument_count:
-                            logging.warning(f'disqualifying {module_name}.{class_name}: '
+                            LOG.warning(f'disqualifying {module_name}.{class_name}: '
                                             f'constructor positional arguments mismatch ({positional_count} wanted, '
                                             f'{argument_count} exist)')
                             continue
@@ -273,7 +276,7 @@ def load(programs_dir: str, argument_count):
                             if isinstance(pluggram_module_class.OPTIONS, list):
                                 option_definitions = pluggram_module_class.OPTIONS
                             else:
-                                logging.warning(f'disqualifying {module_name}.{class_name}: '
+                                LOG.warning(f'disqualifying {module_name}.{class_name}: '
                                                 f'"OPTIONS" property is not a list')
                                 continue
 
@@ -287,6 +290,6 @@ def load(programs_dir: str, argument_count):
                                                            positional_count,
                                                            options=option_definitions))
 
-                        logging.info(f'loaded pluggram {module_name}.{class_name} ("{module_path}")')
+                        LOG.info(f'loaded pluggram {module_name}.{class_name} ("{module_path}")')
 
     return pluggram_metas

@@ -20,7 +20,7 @@ import hmac
 import enum
 import logging
 
-
+LOG = logging.getLogger('ledscreen.web.auth')
 bp = Blueprint('auth', __name__)
 
 
@@ -34,11 +34,11 @@ def check_user_valid(user: User):
             if not user.locked:
                 return True
             else:
-                logging.debug(f'user validate: "{user.uid}" is not active')
+                LOG.debug(f'user validate: "{user.uid}" is not active')
         else:
-            logging.debug(f'user validate: "{user.uid}" has expired')
+            LOG.debug(f'user validate: "{user.uid}" has expired')
 
-    logging.debug(f'user validate: not valid')
+    LOG.debug(f'user validate: not valid')
     return False
 
 
@@ -49,11 +49,11 @@ def check_session_valid(s: Session):
         if s.expires_at > datetime.utcnow():
             return True
         else:
-            logging.info(f'session validate: "{short_text}" has expired')
+            LOG.info(f'session validate: "{short_text}" has expired')
     else:
-        logging.warning(f'session validate: "{short_text}" has invalid expiration date')
+        LOG.warning(f'session validate: "{short_text}" has invalid expiration date')
 
-    logging.debug(f'session validate: not valid')
+    LOG.debug(f'session validate: not valid')
     return False
 
 
@@ -96,7 +96,7 @@ def get_auth_status() -> Union[AuthResult, None]:
             if user is not None:
                 return AuthResult(session_entry, user)
             else:
-                logging.warning(f'session "{session_entry.sid[:16]}" not associated with user')
+                LOG.warning(f'session "{session_entry.sid[:16]}" not associated with user')
 
     return None
 
@@ -110,7 +110,7 @@ def get_home_url(user: User):
         if workspace is not None:
             return url_for(common.USER_WORKSPACE_PAGE, wid=workspace.wid)
         else:
-            logging.warning(f'user "{user.uid}" has no workspace')
+            LOG.warning(f'user "{user.uid}" has no workspace')
     return None
 
 
@@ -137,7 +137,7 @@ def redirect_home(user: User):
     if destination is not None:
         return redirect(destination)
 
-    logging.debug(f'login page redirect skipped for user {user.uid}')
+    LOG.debug(f'login page redirect skipped for user {user.uid}')
     return render_template(common.LOGIN_TEMPLATE, mid=LoginMessage.NO_HOME)
 
 
@@ -178,7 +178,7 @@ def logout():
                 user = User.query.get(session_entry.owner)
                 user.logout_at = datetime.utcnow()
 
-                logging.info(f'logging out out {user.uid} from session {session_entry.sid[:16]}')
+                LOG.info(f'logging out out {user.uid} from session {session_entry.sid[:16]}')
                 session.delete(session_entry)
             return redirect(url_for(common.LOGIN_PAGE, mid=int(LoginMessage.LOGGED_OUT)))
 
@@ -200,7 +200,7 @@ def create_user_session(user, auth_result=None):
         session.add(session_entry)
         user.login_at = current_time
 
-    logging.info(f'authenticated {user.uid} with session {sid[:16]}')
+    LOG.info(f'authenticated {user.uid} with session {sid[:16]}')
 
     return sid, expiration
 
@@ -229,7 +229,7 @@ def login():
             try:
                 default_mid = int(mid_parameter)
             except ValueError:
-                logging.debug('non-integer value passed as MID parameter')
+                LOG.debug('non-integer value passed as MID parameter')
                 pass
 
         next_parameter = request.args.get('next')
@@ -240,7 +240,7 @@ def login():
 
         if request.method == 'POST':
             form_code = request.form.get('code')
-            logging.debug(f'attempting login using code "{form_code}"')
+            LOG.debug(f'attempting login using code "{form_code}"')
 
             if form_code is not None and len(form_code) == 8:
                 with session.begin():
@@ -271,7 +271,7 @@ def login():
                             else:
                                 response = respond_with_cookie(sid, expiration, redirect(destination))
                         else:
-                            logging.debug(f'redirecting according to next parameter "{next_parameter}"')
+                            LOG.debug(f'redirecting according to next parameter "{next_parameter}"')
                             response = respond_with_cookie(sid, expiration, redirect(next_parameter))
                         return response
                     else:

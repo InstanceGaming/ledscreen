@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, request, render_template, url_for
 from models import UserType, Workspace
 from routes.authentication import auth_or_login
@@ -5,7 +7,7 @@ from database import session
 from datetime import datetime as dt
 import common
 
-
+LOG = logging.getLogger('ledscreen.web.workspaces')
 bp = Blueprint('workspaces', __name__, url_prefix='/workspace')
 
 

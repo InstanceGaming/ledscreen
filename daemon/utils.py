@@ -5,11 +5,20 @@ import random
 import os
 import pytoml
 import logging
+from urllib.parse import urlparse
 from dotted.collection import DottedDict
 from typing import Tuple, Union, NoReturn, Callable
 
 
+LOG = logging.getLogger('ledscreen.utils')
 MAX_COLORS = 16777215
+
+
+def get_url_port(url_text: str) -> Union[None, int]:
+    try:
+        return urlparse(url_text).port
+    except ValueError:
+        return None
 
 
 def get_config_path():
@@ -19,7 +28,7 @@ def get_config_path():
 def _config_node_or_exit(config: DottedDict, key: str):
     value = config.get(key)
     if value is None:
-        logging.error(f'"{key}" path must be defined in config')
+        LOG.error(f'"{key}" path must be defined in config')
         exit(3)
     return value
 
@@ -28,7 +37,7 @@ def load_config():
     config_path = get_config_path()
 
     if config_path is None:
-        logging.error('LS_CONFIG environment variable is not set')
+        LOG.error('LS_CONFIG environment variable is not set')
         exit(20)
 
     config = None
@@ -38,13 +47,13 @@ def load_config():
             with open(config_path, 'r') as cf:
                 config = DottedDict(pytoml.load(cf))
         except OSError as e:
-            logging.error(f'open("{config_path}") failed: {str(e)}')
+            LOG.error(f'open("{config_path}") failed: {str(e)}')
             exit(1)
         except pytoml.TomlError as e:
-            logging.error(f'config parse failed: {str(e)}')
+            LOG.error(f'config parse failed: {str(e)}')
             exit(2)
     else:
-        logging.error(f'config missing at "{config_path}"')
+        LOG.error(f'config missing at "{config_path}"')
         exit(1)
 
     _config_node_or_exit(config, 'development_server')
@@ -83,6 +92,14 @@ def load_config():
     _config_node_or_exit(config, 'ipc')
     _config_node_or_exit(config, 'ipc.rx')
     _config_node_or_exit(config, 'ipc.tx')
+
+    if get_url_port(config['ipc.rx']) is None:
+        LOG.error(f'"ipc.rx" must define a port number')
+        exit(3)
+
+    if get_url_port(config['ipc.tx']) is None:
+        LOG.error(f'"ipc.tx" must define a port number')
+        exit(3)
 
     return config
 
@@ -135,7 +152,7 @@ def fix_text(message, encoding='UTF-8'):
         return str(message, encoding)
 
 
-def text_dimensions(message: str, size: int, bold=False, italic=False) -> Tuple[int, int]:
+def text_dimensions(message: str, size: int, bold=False) -> Tuple[int, int]:
     message = fix_text(message)
     size = check_font_size(size)
     w = 0
@@ -194,7 +211,13 @@ def position_to_index(position: Union[Tuple, int], w: int, h: int) -> NoReturn:
     raise ValueError('position argument has invalid structure')
 
 
-def check_font_size(size: int) -> NoReturn:
+def check_font_size(size: int, bold=False) -> NoReturn:
+    """
+    Check if the current font size is possible.
+    :param size: Desired font size.
+    :param bold: If the font should be considered in bold.
+    :raises ValueError: If the font cannot be displayed at this size.
+    """
     if size is None:
         raise ValueError('font size cannot be none')
 
@@ -203,4 +226,7 @@ def check_font_size(size: int) -> NoReturn:
 
 
 def timing_counter():
+    """
+    perf_counter() in milliseconds.
+    """
     return time.perf_counter() * 1000

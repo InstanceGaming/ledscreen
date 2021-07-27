@@ -5,6 +5,7 @@ import api
 import ipc_common as ipc
 import utils
 
+LOG = logging.getLogger('ledscreen.ipc')
 _IPC_SERVER_EXIT_EVENT = threading.Event()
 _IPC_THREAD = None
 
@@ -18,7 +19,7 @@ def get_context(rx_uri, tx_uri):
         zmq_txs = zmq_context.socket(zmq.PUSH)
         zmq_txs.connect(tx_uri)
     except zmq.ZMQError as e:
-        logging.error(f'IPC bind error: {str(e)}')
+        LOG.error(f'IPC bind error: {str(e)}')
         exit(30)
 
 
@@ -33,9 +34,9 @@ def ipc_server(exit_event: threading.Event(), screen: api.Screen, rx, tx, receiv
             if error is None:
                 if frame_type == ipc.StandardFrame.SESSION_INFO:
                     user_id = data
-                    logging.info(f'IPC user "{user_id}"')
+                    LOG.info(f'IPC user "{user_id}"')
                     tx.send(ipc.ScreenInfoFrame.encode(screen.width, screen.height), zmq.NOBLOCK)
-                    logging.info(f'IPC sent screen info')
+                    LOG.info(f'IPC sent screen info')
                 elif frame_type == ipc.StandardFrame.CLEAR:
                     screen.clear()
                 elif frame_type == ipc.StandardFrame.RENDER:
@@ -46,12 +47,12 @@ def ipc_server(exit_event: threading.Event(), screen: api.Screen, rx, tx, receiv
 
                     screen.set_pixel(index, color)
                 else:
-                    logging.warning(f'IPC unhandled frame type "{frame_type}"')
+                    LOG.warning(f'IPC unhandled frame type "{frame_type}"')
             else:
-                logging.warning(f'IPC decoding error: {error.name} for {frame_type.name} frame')
+                LOG.warning(f'IPC decoding error: {error.name} for {frame_type.name} frame')
             after = utils.timing_counter()
             delta = after - before
-            logging.debug(f'IPC "{frame_type.name}" handled in {delta:0.2f}ms')
+            LOG.debug(f'IPC "{frame_type.name}" handled in {delta:0.2f}ms')
 
         if exit_event.isSet():
             rx.close()

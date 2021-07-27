@@ -1,13 +1,9 @@
 import argparse
-import logging
 import dateparser
 import system
 import database
 from utils import load_config
 from sqlalchemy.exc import SQLAlchemyError
-
-logging.basicConfig(level=logging.DEBUG,
-                    format='[%(levelname)s][%(module)s:%(lineno)s]: %(message)s')
 
 
 def parse_args():
@@ -58,7 +54,6 @@ if __name__ == '__main__':
     setup_db = cla.command == 'setup-db'
     create_user = cla.command == 'create-user'
     reset = cla.command == 'reset'
-    archive_dir = cla.archive_dir[0]
 
     config = load_config()
     uri = config['database.uri']
@@ -76,6 +71,7 @@ if __name__ == '__main__':
         print('Setup database successfully.')
         exit(0)
     elif reset:
+        archive_dir = cla.archive_dir[0]
         system.reset(archive_dir=archive_dir)
 
         print('Reset successful.')

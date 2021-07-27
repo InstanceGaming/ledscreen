@@ -55,6 +55,33 @@
     </style>
 </head>
 <body>
+<!-- Reset confirmation -->
+<div class="modal fade" id="reset-modal" tabindex="-1" aria-labelledby="reset-confirm-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reset-confirm-label">Confirm Reset</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h4>Are you absolutely sure?</h4>
+                <h6><b>This action CANNOT BE UNDONE.</b></h6>
+                <hr/>
+                <p>
+                    When pressed, all system webpages will temporarily stop working.
+                    This process will take 3 minutes or less and then the system will restart.
+                </p>
+                <p>
+                    When going through first-time setup again, you will be prompted for the password for this account.
+                </p>
+            </div>
+            <div class="p-4 text-center">
+                <a type="button" class="btn btn-danger" style="margin-right: 5rem;" href="/api/system/reset">Begin reset</a>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
 <main>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
@@ -72,11 +99,11 @@
                             System
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="defaultDropdown">
-                            <li><a class="dropdown-item link-danger" href="#">Yearly reset</a></li>
-                            <li><a class="dropdown-item link-danger" href="#">Hard reset</a></li>
+                            <li><a class="dropdown-item link-danger" href="#" data-bs-toggle="modal"
+                                   data-bs-target="#reset-modal">Reset</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="#">Restart</a></li>
-                            <li><a class="dropdown-item" href="#">Shutdown</a></li>
+                            <li><a class="dropdown-item" href="#">Power Off</a></li>
                         </ul>
                     </div>
                     <div class="btn-group me-2">
@@ -161,19 +188,20 @@
                             Students ({{ students|length }})
                         </div>
                         <div class="card-panel card-body">
+                            {% if students|length > 0 %}
                             <div class="my-2">
-                                <div class="btn-group" role="group" aria-label="Student table actions">
-                                    <button type="button" class="btn btn-success" id="add-student">
-                                        <span class="bi-person-plus-fill btn-icon-combo" role="img"></span>
-                                        Add Student
-                                    </button>
-                                </div>
+                                <button type="button" class="btn btn-success" id="add-student-btn">
+                                    <span class="bi-person-plus-fill btn-icon-combo" role="img"></span>
+                                    Add Student
+                                </button>
                                 <div class="float-end">
-                                    <button type="button" class="btn btn-outline-primary" title="Upload CSV">
+                                    <button type="button" class="btn btn-outline-primary" title="Upload CSV"
+                                            id="import-csv-btn">
                                         <i class="bi-upload" role="img"
                                            aria-label="Upload CSV"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-primary" title="Download CSV">
+                                    <button type="button" class="btn btn-outline-primary" title="Download CSV"
+                                            id="export-csv-btn">
                                         <i class="bi-download" role="img"
                                            aria-label="Download CSV"></i>
                                     </button>
@@ -229,6 +257,20 @@
                                     {% endfor %}
                                 </table>
                             </div>
+                            {% else %}
+                            <div class="text-center my-2">
+                                <p><i>Nothing to list here, yet.</i></p>
+                                <button type="button" class="btn btn-success" id="add-student-btn">
+                                    <span class="bi-person-plus-fill btn-icon-combo" role="img"></span>
+                                    Add Student
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="import-csv-btn">
+                                    <i class="bi-upload" role="img"
+                                       aria-label="Upload CSV"></i>
+                                    Import CSV
+                                </button>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

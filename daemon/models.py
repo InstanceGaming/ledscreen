@@ -14,8 +14,11 @@ from database import Base, session
 import enum
 import logging
 
+LOG = logging.getLogger('ledscreen.models')
+
 
 SESSION_TOKEN_LENGTH = 64
+RUN_LOG_TOKEN_LENGTH = 64
 WORKSPACE_TOKEN_LENGTH = 32
 USER_TOKEN_LENGTH = 8
 
@@ -181,6 +184,7 @@ class RunLog(Base):
     exit_reason = Column(Enum(ExitReason), nullable=True)
     interpreter_path = Column(UnicodeText(), nullable=False)
     run_path = Column(UnicodeText(), nullable=False)
+    pid = Column(Integer(), nullable=False)
 
     owner = Column(String(8),
                    ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
@@ -191,6 +195,7 @@ class RunLog(Base):
 
     def __init__(self,
                  rid: str,
+                 pid: int,
                  interpreter_path: str,
                  run_path: str,
                  user=None,
@@ -199,6 +204,7 @@ class RunLog(Base):
         current_datetime = datetime or dt.utcnow()
 
         self.rid = rid
+        self.pid = pid
         self.interpreter_path = interpreter_path
         self.run_path = run_path
         self.user = user
@@ -206,7 +212,7 @@ class RunLog(Base):
         self.started_at = current_datetime
 
     def __repr__(self):
-        return f'<RunLog {self.short_rid} run_path={self.py_file} user={self.user} workspace={self.workspace}>'
+        return f'<RunLog {self.short_rid} pid={self.pid} run_path={self.py_file} user={self.user} workspace={self.workspace}>'
 
 
 def lookup_sid_cs(input_sid: str) -> Union[None, Session]:
@@ -219,11 +225,31 @@ def lookup_sid_cs(input_sid: str) -> Union[None, Session]:
         return Session.query.filter(Session.sid == func.binary(input_sid)).first()
 
 
+def lookup_rid_cs(input_rid: str) -> Union[None, RunLog]:
+    """
+    Case-sensitive run log ID lookup.
+    :param input_rid: proposed run log ID
+    :return: RunLog instance or None
+    """
+    with session.begin():
+        return RunLog.query.filter(RunLog.rid == func.binary(input_rid)).first()
+
+
+def generate_run_log_token_safe():
+    result = generate_sanitized_alphanumerics(RUN_LOG_TOKEN_LENGTH, special=True)
+
+    if lookup_rid_cs(result) is not None:
+        LOG.info('one in a zillion just happened!')
+        return generate_run_log_token_safe()
+
+    return result
+
+
 def generate_session_token_safe():
     result = generate_sanitized_alphanumerics(SESSION_TOKEN_LENGTH, special=True)
 
     if lookup_sid_cs(result) is not None:
-        logging.info('one in a zillion just happened!')
+        LOG.info('one in a zillion just happened!')
         return generate_session_token_safe()
 
     return result
@@ -233,9 +259,11 @@ def generate_workspace_token_safe():
     result = generate_url_binary(WORKSPACE_TOKEN_LENGTH)
 
     with session.begin():
-        if Workspace.query.get(result) is not None:
-            logging.info('one in a zillion just happened!')
-            return generate_workspace_token_safe()
+        exists = Workspace.query.get(result) is not None
+
+    if exists:
+        LOG.info('one in a zillion just happened!')
+        return generate_workspace_token_safe()
 
     return result
 
@@ -244,8 +272,10 @@ def generate_user_token_safe():
     result = generate_sanitized_alphanumerics(USER_TOKEN_LENGTH, lowercase=False)
 
     with session.begin():
-        if User.query.get(result) is not None:
-            logging.info('one in a zillion just happened!')
-            return generate_user_token_safe()
+        exists = User.query.get(result) is not None
+
+    if exists:
+        LOG.info('one in a zillion just happened!')
+        return generate_user_token_safe()
 
     return result

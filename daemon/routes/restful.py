@@ -1,7 +1,8 @@
+import logging
 from flask import Blueprint, request
 from flask_restful import Api, Resource
 from common import LIMITER, CONFIG
-from .authentication import auth_endpoint_allowed
+from .authentication import auth_endpoint_allowed, get_auth_status
 from utils import enum_name_or_null, isoformat_or_null
 from models import (User,
                     RunTarget,
@@ -9,9 +10,32 @@ from models import (User,
                     Workspace)
 import system
 
-
+LOG = logging.getLogger('ledscreen.web.api')
 bp = Blueprint('api', __name__, url_prefix='/api')
 api = Api(bp)
+
+
+class ResetSystem(Resource):
+    decorators = [LIMITER.limit("1/minute")]
+
+    def get(self):
+        auth_result = get_auth_status()
+
+        if auth_result is not None and auth_result.valid:
+            system.reset(keep_user=auth_result.user, archive_dir=CONFIG['app.archive_dir'])
+
+            try:
+                system.restart()
+            except:
+                LOG.info('requesting system restart failed')
+                pass
+
+            return {}, 200
+
+        return {}, 403
+
+
+api.add_resource(ResetSystem, '/system/reset')
 
 
 class Workspaces(Resource):

@@ -1,3 +1,5 @@
+import time
+import utils
 from datetime import datetime as dt
 from pluggram import Pluggram, Option
 
@@ -16,18 +18,29 @@ class WallClock(Pluggram):
 
     def __init__(self,
                  screen,
-                 **kwargs):
-        self._show_seconds = kwargs['show_seconds']
-        self._flash_colon = kwargs['flash_colon']
-        self._foreground = kwargs['foreground']
-        self._background = kwargs['background']
-        self._size = kwargs['font_size']
+                 **options):
+        self._show_seconds = options['show_seconds']
+        self._flash_colon = options['flash_colon']
+        self._foreground = options['foreground']
+        self._background = options['background']
+        self._size = options['font_size']
         self._screen = screen
         self._flasher = False
+        self._text_width = None
 
         screen.fill(self._background)
 
     def render(self):
+        # format time
         message = dt.now().strftime(f'%I{(":" if self._flasher else " ")}%M{("%S" if self._show_seconds else "")}%p')
-        self._screen.draw_text(self._screen.center_index, self._foreground, self._size, message, bold=True)
+        # get the text size
+        if self._text_width is None:
+            self._text_width, _ = utils.text_dimensions(message, self._size, bold=True)
+        # adjust the center to the text size
+        i = self._screen.center_index - (self._text_width / 2)
+        # draw the text to screen
+        self._screen.draw_text(i, self._foreground, self._size, message, bold=True)
+        # invert the colon
         self._flasher = not self._flasher
+
+        time.sleep(1)

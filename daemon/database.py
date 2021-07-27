@@ -3,7 +3,8 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.util import nullcontext
 
-_raw_session = sessionmaker(autocommit=True, autoflush=False)
+_raw_session = sessionmaker(autocommit=True,
+                            autoflush=False)
 session = scoped_session(_raw_session)
 
 Base = declarative_base()
@@ -11,7 +12,11 @@ Base.query = session.query_property()
 
 
 def init(connection_uri: str):
-    engine = create_engine(connection_uri, convert_unicode=True)
+    engine = create_engine(connection_uri,
+                           pool_pre_ping=True,
+                           pool_size=30,
+                           pool_recycle=3600,
+                           pool_timeout=5)
     _raw_session.configure(bind=engine)
 
 

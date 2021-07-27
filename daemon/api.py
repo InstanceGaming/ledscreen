@@ -1,5 +1,6 @@
 import logging
 
+LOG = logging.getLogger('ledscreen.api')
 
 try:
     import rpi_ws281x
@@ -47,7 +48,7 @@ class Screen:
 
         self._global_brightness = v
         self._pixel_strip.setBrightness(self._global_brightness)
-        logging.debug('global screen brightness changed ({})'.format(v))
+        LOG.debug('global screen brightness changed ({})'.format(v))
 
     def __init__(self, w: int, h: int, output_pin: int, frequency: int, dma_channel: int, global_brightness: int,
                  invert_signal: bool, gpio_channel: int):
@@ -76,13 +77,8 @@ class Screen:
                   index: int,
                   color: int,
                   size: int,
-                  text: str,
-                  stroke_width=0,
-                  stroke_color=None,
-                  bold=False,
-                  italic=False,
-                  underlined=False,
-                  strikethrough=False):
+                  message: str,
+                  bold=False):
         # todo: mind-bending text graphics
         raise NotImplementedError()
 

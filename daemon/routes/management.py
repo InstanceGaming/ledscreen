@@ -1,9 +1,10 @@
+import logging
 from flask import Blueprint, render_template, abort, request
 from models import UserType, User
 from common import MANAGEMENT_TEMPLATE, PROGRAMS
 from .authentication import auth_or_login
 
-
+LOG = logging.getLogger('ledscreen.web.management')
 bp = Blueprint('manage', __name__, url_prefix='/manage')
 
 
@@ -16,8 +17,6 @@ def index():
         'Students Online': 8,
         'Runs': 48,
         'Exceptions': 23,
-        'Syntax Errors': 5,
-        'Registered Students': 39,
         'Workspaces': 39
     }
 
