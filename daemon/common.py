@@ -1,17 +1,30 @@
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+import api
 
 LIMITER = Limiter(key_func=get_remote_address)
 CONFIG = {}
 PROGRAMS = []
+SCREEN = None
+THREADS = []
 
 
 def init(app, config, programs):
-    global LIMITER, CONFIG, PROGRAMS
+    global LIMITER, CONFIG, PROGRAMS, SCREEN
     LIMITER.init_app(app)
     CONFIG = config
     PROGRAMS = programs
+    SCREEN = api.Screen(
+        CONFIG['screen.width'],
+        CONFIG['screen.height'],
+        CONFIG['screen.gpio_pin'],
+        CONFIG['screen.frequency'],
+        CONFIG['screen.dma_channel'],
+        CONFIG['screen.max_brightness'],
+        CONFIG['screen.inverted'],
+        CONFIG['screen.gpio_channel']
+    )
 
 
 LOGIN_PAGE = 'auth.login'

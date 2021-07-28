@@ -91,17 +91,48 @@ def load_config():
 
     _config_node_or_exit(config, 'ipc')
     _config_node_or_exit(config, 'ipc.rx')
-    _config_node_or_exit(config, 'ipc.tx')
 
     if get_url_port(config['ipc.rx']) is None:
         LOG.error(f'"ipc.rx" must define a port number')
         exit(3)
 
-    if get_url_port(config['ipc.tx']) is None:
-        LOG.error(f'"ipc.tx" must define a port number')
-        exit(3)
-
     return config
+
+
+def pretty_elapsed_ms(before, now):
+    return pretty_ms(now - before)
+
+
+def pretty_ms(milliseconds):
+    if milliseconds is not None:
+        if milliseconds <= 1000:
+            if isinstance(milliseconds, float):
+                return '{:04.2f}ms'.format(milliseconds)
+            return '{:04d}ms'.format(milliseconds)
+        elif 1000 < milliseconds <= 60000:
+            seconds = milliseconds / 1000
+            return '{:02.2f}s'.format(seconds)
+        elif milliseconds > 60000:
+            minutes = milliseconds / 60000
+            return '{:02.2f}min'.format(minutes)
+    return None
+
+
+def pretty_timedelta(td, prefix=None, format_spec=None):
+    prefix = prefix or ''
+    format_spec = format_spec or '02.2f'
+
+    if td is not None:
+        seconds = td.total_seconds()
+        if seconds < 60:
+            return prefix + format(seconds, format_spec) + ' seconds'
+        elif 60 <= seconds < 3600:
+            return prefix + format(seconds / 60, format_spec) + ' minutes'
+        elif 3600 <= seconds < 86400:
+            return prefix + format(seconds / 3600, format_spec) + ' hours'
+        elif 86400 <= seconds:
+            return prefix + format(seconds / 86400, format_spec) + ' days'
+    return None
 
 
 def enum_name_or_null(e):

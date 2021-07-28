@@ -21,24 +21,24 @@ class DecodeError(IntEnum):
     BAD_HEADER = 2
     LENGTH = 3
     PARSE_FAIL = 4
+    UNKNOWN_TYPE = 5
 
 
 class StandardFrame(IntEnum):
     AWK = 1
     NAK = 2
     ERR = 3
-    SESSION_INFO = 4
-    SCREEN_INFO = 5
-    RENDER = 6
-    SET_PIXEL = 7
-    CLEAR = 8
-    FILL = 9
-    LOAD_FONT = 10
-    DRAW_TEXT = 11
-    DRAW_POLY = 12
-    DRAW_ELPS = 13
-    FILL_IMAGE = 14
-    PLAY_VIDEO = 15
+    SCREEN_INFO = 10
+    RENDER = 20
+    SET_PIXEL = 21
+    CLEAR = 22
+    FILL = 23
+    LOAD_FONT = 24
+    DRAW_TEXT = 25
+    DRAW_POLY = 26
+    DRAW_ELPS = 27
+    FILL_IMAGE = 28
+    PLAY_VIDEO = 29
     UNKNOWN = 255
 
 
@@ -96,25 +96,8 @@ def decode(b: bytes):
                         ]
                     except ValueError:
                         error = DecodeError.PARSE_FAIL
-            elif frame_type == StandardFrame.SCREEN_INFO:
-                if payload_length != 4:
-                    error = DecodeError.LENGTH
-                else:
-                    try:
-                        data = [
-                            int_from_bytes(payload[:2], 2),
-                            int_from_bytes(payload[2:], 2)
-                        ]
-                    except ValueError:
-                        error = DecodeError.PARSE_FAIL
-            elif frame_type == StandardFrame.SESSION_INFO:
-                if payload_length != 4:
-                    error = DecodeError.LENGTH
-                else:
-                    try:
-                        data = int_from_bytes(payload, 4)
-                    except ValueError:
-                        error = DecodeError.PARSE_FAIL
+            else:
+                error = DecodeError.UNKNOWN_TYPE
     else:
         error = DecodeError.EMPTY
 
@@ -230,11 +213,3 @@ class ScreenInfoFrame:
     @staticmethod
     def encode(width: int, height: int) -> bytes:
         return int_to_bytes(ScreenInfoFrame.STANDARD, 1) + int_to_bytes(width, 2) + int_to_bytes(height, 2)
-
-
-class SessionInfoFrame:
-    STANDARD = StandardFrame.SESSION_INFO
-
-    @staticmethod
-    def encode(student_id: int) -> bytes:
-        return int_to_bytes(SessionInfoFrame.STANDARD, 1) + int_to_bytes(student_id, 4)

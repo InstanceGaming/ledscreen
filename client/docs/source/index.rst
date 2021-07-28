@@ -3,14 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to ledscreen's documentation!
+Documentation for `ledscreen`
 =====================================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 	
-   modules
+   examples
    ledscreen
 
 Indices and tables

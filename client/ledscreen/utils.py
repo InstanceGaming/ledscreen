@@ -7,8 +7,9 @@ MAX_COLORS = 16777215
 
 def timing_counter():
     """
-    Monotonic, high-precision system counter.
-    :return: an integer value relative only to itself.
+    A monotonic, high-precision system counter. Useful for timing events.
+
+    :return: an integer counter relative only to itself.
     """
     return time.perf_counter() * 1000
 
@@ -32,6 +33,12 @@ def text_dimensions(message: str, size: int, bold=False, italic=False) -> Tuple[
 
 
 def fix_text(message, encoding='UTF-8'):
+    """
+    Internal. Coerce strings from message object.
+
+    :param message: message object.
+    :return: the message if it was already a string, otherwise the UTF-8 str() representation.
+    """
     if isinstance(message, str):
         return message
     else:
@@ -39,6 +46,13 @@ def fix_text(message, encoding='UTF-8'):
 
 
 def normalize_color(color: int) -> int:
+    """
+    Normalize color value to be more balanced.
+
+    :param color: original user-supplied color.
+    :return: normalized color value.
+    """
+
     if color is None:
         color = 0
 
@@ -50,6 +64,13 @@ def normalize_color(color: int) -> int:
 
 
 def adjust_color(color: int, multiplier: int) -> int:
+    """
+    Factor color multiplier and normalize.
+
+    :param color: original user-supplied color.
+    :param multiplier: an intensity factor 0-1.
+    :return: adjusted and scaled color value.
+    """
     color_adjusted = normalize_color(color)
     check_multiplier(multiplier)
 
@@ -61,15 +82,26 @@ def adjust_color(color: int, multiplier: int) -> int:
 
 
 def check_multiplier(multiplier: int) -> NoReturn:
+    """
+    Internal. Enforce multiplier range (0-1).
+
+    :param multiplier: value to be checked.
+    """
     # multiplier being None is the same as 1
     if multiplier is not None:
         if multiplier > 1:
             raise ValueError('multiplier value must be within range 0-1, was {}'.format(multiplier))
 
 
-def position_to_index(position: Union[Tuple, int], w: int, h: int) -> NoReturn:
+def verify_position(position, w: int, h: int) -> NoReturn:
+    """
+    Internal. Enforce either (x, y) coordinates or single-integer format for screen positioning.
+
+    :param position: value to be checked.
+    :param w: width of the screen instance.
+    :param h: height of the screen instance.
+    """
     count = w * h
-    # enforce either x, y coordinates or index
     if isinstance(position, int):
         if position > count or position < 0:
             raise ValueError('index must be within range 0-{}, was {}'.format(count, position))
@@ -88,7 +120,14 @@ def position_to_index(position: Union[Tuple, int], w: int, h: int) -> NoReturn:
     raise ValueError('position argument has invalid structure')
 
 
-def check_font_size(size: int) -> NoReturn:
+def check_font_size(size: int, bold=False) -> NoReturn:
+    """
+    Determine if font supports given size and styling options.
+
+    :param size: desired font size to check.
+    :param bold: consider the font when bolded.
+    :raises ValueError: when the font does not support these parameters.
+    """
     if size is None:
         raise ValueError('font size cannot be none')
 

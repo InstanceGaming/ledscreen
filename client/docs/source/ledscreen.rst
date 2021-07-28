@@ -9,8 +9,18 @@ ledscreen package
 Submodules
 ----------
 
-.. toctree::
-   :maxdepth: 4
+ledscreen.api module
+--------------------
 
-   ledscreen.api
-   ledscreen.utils
+.. automodule:: ledscreen.api
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ledscreen.utils module
+----------------------
+
+.. automodule:: ledscreen.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:

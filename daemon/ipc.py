@@ -10,20 +10,7 @@ _IPC_SERVER_EXIT_EVENT = threading.Event()
 _IPC_THREAD = None
 
 
-def get_context(rx_uri, tx_uri):
-    zmq_context = zmq.Context()
-
-    try:
-        zmq_rxs = zmq_context.socket(zmq.PULL)
-        zmq_rxs.bind(rx_uri)
-        zmq_txs = zmq_context.socket(zmq.PUSH)
-        zmq_txs.connect(tx_uri)
-    except zmq.ZMQError as e:
-        LOG.error(f'IPC bind error: {str(e)}')
-        exit(30)
-
-
-def ipc_server(exit_event: threading.Event(), screen: api.Screen, rx, tx, receive_timeout: int):
+def ipc_server(exit_event: threading.Event(), screen: api.Screen, rx, receive_timeout: int):
     poller = zmq.Poller()
     poller.register(rx, zmq.POLLIN)
     while True:
@@ -32,12 +19,7 @@ def ipc_server(exit_event: threading.Event(), screen: api.Screen, rx, tx, receiv
             data, frame_type, error = ipc.decode(message)
             before = utils.timing_counter()
             if error is None:
-                if frame_type == ipc.StandardFrame.SESSION_INFO:
-                    user_id = data
-                    LOG.info(f'IPC user "{user_id}"')
-                    tx.send(ipc.ScreenInfoFrame.encode(screen.width, screen.height), zmq.NOBLOCK)
-                    LOG.info(f'IPC sent screen info')
-                elif frame_type == ipc.StandardFrame.CLEAR:
+                if frame_type == ipc.StandardFrame.CLEAR:
                     screen.clear()
                 elif frame_type == ipc.StandardFrame.RENDER:
                     screen.render()
@@ -56,15 +38,13 @@ def ipc_server(exit_event: threading.Event(), screen: api.Screen, rx, tx, receiv
 
         if exit_event.isSet():
             rx.close()
-            tx.close()
             break
 
 
-def start_ipc_thread(screen: api.Screen, rx, tx, receive_timeout: int):
+def start_ipc_thread(screen: api.Screen, rx, receive_timeout: int):
     thread = threading.Thread(target=ipc_server, args=[_IPC_SERVER_EXIT_EVENT,
                                                        screen,
                                                        rx,
-                                                       tx,
                                                        receive_timeout])
     thread.daemon = True
     thread.start()

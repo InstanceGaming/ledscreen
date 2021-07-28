@@ -42,41 +42,28 @@
                 <div class="mb-3">
                     {% if mid == 1 %}
                     <div class="alert alert-danger" role="alert">
-                        Previous password incorrect.
+                        Username must be between 1 and 40 characters long.
                     </div>
                     {% endif %}
                     {% if mid == 2 %}
                     <div class="alert alert-danger" role="alert">
-                        Username must be between 1 and 40 characters long.
+                        Password confirmation does not match.
                     </div>
                     {% endif %}
                     {% if mid == 3 %}
                     <div class="alert alert-danger" role="alert">
-                        Password confirmation does not match.
-                    </div>
-                    {% endif %}
-                    {% if mid == 4 %}
-                    <div class="alert alert-danger" role="alert">
                         All fields are required.
                     </div>
                     {% endif %}
-                    {% if mid == 5 %}
+                    {% if mid == 4 %}
                     <div class="alert alert-danger" role="alert">
                         Password must be between 6 and 64 characters long.
                     </div>
                     {% endif %}
                 </div>
                 {% endif %}
-                {% if previous %}
                 <div class="form-floating mb-3">
-                    <input type="password" spellcheck="false" maxlength="64" minlength="6"
-                           name="previous-password"
-                           id="previous-password-field" class="form-control">
-                    <label for="previous-password-field">Previous Password</label>
-                </div>
-                {% endif %}
-                <div class="form-floating mb-3">
-                    <input type="text" spellcheck="false" maxlength="64" minlength="6"
+                    <input type="text" spellcheck="false" maxlength="40" minlength="1"
                            name="username"
                            id="username-field" class="form-control">
                     <label for="username-field">Your Name</label>

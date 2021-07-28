@@ -8,11 +8,13 @@ import shutil
 import pathlib
 import threading
 
-from wheel.util import native
+import zmq
 
 import utils
+import ipc
 from datetime import datetime as dt
-from typing import Callable, Union
+from typing import Callable, Union, Tuple
+from api import Screen
 from common import CONFIG
 from distutils.errors import DistutilsError
 from distutils.dir_util import copy_tree
@@ -23,7 +25,12 @@ from models import (User,
                     Workspace,
                     RunTarget,
                     generate_workspace_token_safe,
-                    generate_user_token_safe, Session, RunStatus, RunLog, generate_run_log_token_safe, ExitReason)
+                    generate_user_token_safe,
+                    Session,
+                    RunStatus,
+                    RunLog,
+                    generate_run_log_token_safe,
+                    ExitReason)
 from pluggram import PluggramMeta
 
 VERSION = '1.0.0'
@@ -47,21 +54,15 @@ def create_user(user_type: UserType,
                 user_name: str,
                 expiry=None,
                 password=None,
-                lock=False,
-                context_needed=True):
+                lock=False):
     uid = generate_user_token_safe()
     short_text = uid[:16]
 
     LOG.debug(f'creating user {short_text}')
 
-    with conditional_context(context_needed):
+    with session.begin():
         if user_type != UserType.STUDENT:
             lock = False
-            accounts_of_type = User.query.filter_by(type=user_type).count()
-
-            if accounts_of_type > 0:
-                LOG.error(f'cannot create another {user_type.name.lower()} account')
-                return None
 
         user = User(uid,
                     user_type,
@@ -69,7 +70,6 @@ def create_user(user_type: UserType,
                     expiry=expiry,
                     password=password,
                     lock=lock)
-
         session.add(user)
 
     LOG.info(f'created user {short_text}')
@@ -180,6 +180,8 @@ def create_workspace(envs_dir: str,
         interpreter_path = os.path.abspath(os.path.join(bin_path, current_interpreter_name))
         LOG.debug(f'interpreter will be at "{interpreter_path}"')
 
+        # todo: install ledscreen module
+
         storage_path = os.path.abspath(os.path.join(storage_dir, wid))
         LOG.debug(f'storage will be at "{interpreter_path}"')
         os.makedirs(storage_path, exist_ok=True)
@@ -244,8 +246,13 @@ def save_workspace_code(w, code_text: str):
     return True
 
 
-def create_run_log(pid: int, interpreter_path: str, run_path: str, workspace=None, user=None):
-    rid = generate_run_log_token_safe()
+def create_run_log(pid: int,
+                   interpreter_path: str,
+                   run_path: str,
+                   workspace=None,
+                   user=None,
+                   rid=None):
+    rid = rid or generate_run_log_token_safe()
 
     if workspace is not None:
         assert isinstance(workspace, str)
@@ -270,7 +277,8 @@ def create_run_log(pid: int, interpreter_path: str, run_path: str, workspace=Non
                          workspace=workspace)
         session.add(run_log)
         LOG.debug(f'created run log {run_log.short_rid}')
-        return run_log
+
+    return run_log
 
 
 def complete_run_log(rid: str,
@@ -308,59 +316,67 @@ def clean_run_dir():
         LOG.warning(f'skipped cleaning run directory: is not a directory')
 
 
-def run_workspace(w, exit_cb: Callable) -> Union[None, threading.Thread]:
+def run_workspace(w, screen: Screen, exit_cb: Callable) -> Tuple:
     """
     Prepare and execute a workspace program.
-    :param w: A :class:Workspace or WID
-    :param exit_cb: a callable with 4 arguments (rid, return_code, stdout, stderr)
-    :return: a Thread instance or None
+    :param screen: A :class:`Screen` instance.
+    :param w: A :class:`Workspace` or WID
+    :param exit_cb: a :class:`Callable` with 4 arguments (rid, return_code, stdout, stderr)
+    :return: a :class:`Thread` instance or None
     """
-
-    def _run_program(_intp: str,
+    def _run_program(_rid: str,
+                     _intp: str,
                      _runp: str,
                      _workspace,
-                     _txp: int,
-                     _rxp: int,
+                     _screen: Screen,
+                     _tx_port: str,
                      _sim: bool,
                      _timeout: int,
                      _cb: Callable):
+
         program_args = [
             interpreter_path,
             run_path,
-            '--screen-host',
-            'localhost',
-            '--tx-port',
-            _txp,
-            '--rx-port',
-            _rxp
+            '--screen-width',
+            str(_screen.width),
+            '--screen-height',
+            str(_screen.height)
         ]
 
         if _sim:
             program_args.append('--simulate')
+        else:
+            program_args.extend([
+                '--screen-host',
+                'localhost',
+                '--tx-port',
+                str(_tx_port)
+            ])
 
-        args_text = ' '.join(program_args)
+        args_text = ''
+
+        for arg in program_args:
+            args_text += f'{str(arg)} '
+
         LOG.info(f'executing "{args_text}"...')
-
-        proc = subprocess.Popen(program_args)
+        proc = subprocess.Popen(program_args, stdout=subprocess.PIPE)
 
         LOG.info(f'spawned PID {proc.pid}')
-
-        # mark workspace as RUNNING
-        with session.begin():
-            workspace.run_status = RunStatus.RUNNING
 
         # create run log
         run_log = create_run_log(proc.pid,
                                  _intp,
                                  _runp,
                                  workspace=_workspace.wid,
-                                 user=_workspace.owner.uid if _workspace.owner is not None else None)
+                                 user=_workspace.owner,
+                                 rid=_rid)
 
         out, err = proc.communicate(timeout=_timeout)
         return_code = proc.returncode
         _cb(run_log.rid, return_code, out, err)
 
     workspace = coerce_workspace(w)
+    rid = generate_run_log_token_safe()
 
     LOG.debug(f'attempting to start workspace {workspace.short_wid}')
     if workspace is not None:
@@ -369,24 +385,30 @@ def run_workspace(w, exit_cb: Callable) -> Union[None, threading.Thread]:
 
         if not os.path.exists(interpreter_path):
             LOG.error(f'workspace {workspace.short_wid}: interpreter does not exist at "{interpreter_path}"')
-            return None
+            return rid, None
 
         storage_dir = workspace.storage_path
         storage_entrypoint_path = os.path.join(workspace.storage_path, workspace.py_file)
         if not os.path.exists(storage_entrypoint_path):
             LOG.error(f'workspace {workspace.short_wid}: entrypoint does not exist at "{storage_entrypoint_path}"')
-            return None
+            return rid, None
 
         run_dir = workspace.run_dir
         if not os.path.isdir(run_dir):
             LOG.error(f'workspace {workspace.short_wid}: run directory does not exist at "{run_dir}"')
-            return None
+            return rid, None
 
         run_path = os.path.join(run_dir, workspace.py_file)
 
-        # mark workspace as STARTING
+        run_on_screen = False
+
+        if workspace.run_privilege == RunTarget.SCREEN:
+            run_on_screen = True
+
+        # mark workspace as STARTING and set target
         with session.begin():
             workspace.run_status = RunStatus.STARTING
+            workspace.run_target = RunTarget.SCREEN if run_on_screen else RunTarget.SIM
 
         # 2. Copy files from storage to run directory
         try:
@@ -398,21 +420,15 @@ def run_workspace(w, exit_cb: Callable) -> Union[None, threading.Thread]:
         except DistutilsError as e:
             LOG.error(f'copying program files to run environment failed: {str(e)}')
             clean_run_dir()
-            return None
+            return rid, None
 
-        # 3. Check if it can run on the big screen or simulator
-        run_on_screen = False
-
-        if workspace.run_privilege == RunTarget.SCREEN:
-            run_on_screen = True
-
-        # 4. If it can run on the screen, stop or pause pluggram, abort if another student program is running
+        # 3. If it can run on the screen, stop or pause pluggram, abort if another student program is running
         if run_on_screen:
             if ACTIVE_PLUGGRAM is not None:
                 pause_pluggram(ACTIVE_PLUGGRAM, clear_screen=True)
 
             with session.begin():
-                running = session.query(RunLog).filter(stopped_at=None).first()
+                running = session.query(RunLog).filter(RunLog.stopped_at is None).first()
 
                 if running is not None:
                     if running.workspace is None:
@@ -421,39 +437,65 @@ def run_workspace(w, exit_cb: Callable) -> Union[None, threading.Thread]:
                     else:
                         LOG.warning(f'tried to start workspace {workspace.short_wid} but '
                                     f'another workspace is currently running ({running.workspace.short_wid})')
-                    return None
+                    return rid, None
+
+        # 4. Start IPC server
+        LOG.info('starting IPC server...')
+
+        rx_uri = CONFIG['ipc.rx']
+        zmq_context = zmq.Context()
+
+        try:
+            zmq_rxs = zmq_context.socket(zmq.PULL)
+            zmq_rxs.bind(rx_uri)
+            ipc.start_ipc_thread(screen, zmq_rxs, 1)
+        except zmq.ZMQError as e:
+            LOG.error(f'IPC error while binding: {str(e)}')
 
         # 5. Start program with timeout (if set)
         timeout = workspace.max_runtime
-        client_tx_port = utils.get_url_port(CONFIG['ipc.rx'])
-        client_rx_port = utils.get_url_port(CONFIG['ipc.tx'])
+        client_port = utils.get_url_port(rx_uri)
 
         thread = threading.Thread(target=_run_program,
-                                  args=[interpreter_path,
+                                  args=[rid,
+                                        interpreter_path,
                                         run_path,
                                         workspace,
-                                        client_tx_port,
-                                        client_rx_port,
+                                        screen,
+                                        client_port,
                                         not run_on_screen,
                                         timeout,
                                         exit_cb])
+
+        with session.begin():
+            workspace.run_status = RunStatus.RUNNING
+
         thread.start()
-        return thread
-    return None
+
+        return rid, thread
+    return rid, None
 
 
-def program_exit_callback(rid: str, return_code: int, stdout, stderror):
-    LOG.info(f'program exited naturally with return-code {return_code}')
+def program_exit_callback(rid: str, return_code: int, stdout, stderr):
+    LOG.debug(f'stopping IPC server...')
+    ipc.kill_ipc_thread()
 
     with session.begin():
         run_log = RunLog.query.get(rid)
 
+    stdout_text = str(stdout, encoding='UTF-8') if stdout is not None else None
+    stderr_text = str(stderr, encoding='UTF-8') if stderr is not None else None
+
     if run_log is not None:
+        delta = dt.utcnow() - run_log.started_at
+        delta_text = utils.pretty_timedelta(delta)
+        LOG.info(f'program exited naturally with return-code {return_code} after {delta_text}')
+
         complete_run_log(run_log.rid,
                          ExitReason.NATURAL,
                          return_code,
-                         stdout,
-                         stderror)
+                         std_out=stdout_text,
+                         std_err=stderr_text)
 
         wid = run_log.workspace
 
@@ -461,7 +503,8 @@ def program_exit_callback(rid: str, return_code: int, stdout, stderror):
             workspace = coerce_workspace(wid)
 
             if workspace is not None:
-                workspace.run_status = RunStatus.IDLE
+                if workspace is not None:
+                    cleanup_workspace(workspace)
     else:
         LOG.error(f'exit callback passed non-existent RID "{rid}"')
 
@@ -471,6 +514,9 @@ def stop_run_log(rid: str, user_action=False):
         run_log = RunLog.query.get(rid)
 
         if run_log is not None:
+            LOG.debug(f'stopping IPC server...')
+            ipc.kill_ipc_thread()
+
             LOG.debug(f'attempting to stop {run_log.short_rid}')
 
             # 1. Stop or kill process
@@ -498,13 +544,13 @@ def cleanup_workspace(w):
     # 1. Move files back to storage
     # 2. Update status
     # todo
-    raise NotImplementedError()
+    with session.begin():
+        workspace.run_status = RunStatus.IDLE
 
 
 def remove_workspace(w):
+    workspace = coerce_workspace(w)
     with session.begin():
-        workspace = coerce_workspace(w)
-
         if workspace is not None:
             LOG.debug(f'attempting to remove workspace {workspace.short_wid}')
             session.delete(workspace)
@@ -521,10 +567,10 @@ def needs_setup() -> bool:
     with session.begin():
         count = session.query(User).count()
 
-        if count < 2:
-            return True
-        else:
-            return False
+    if count > 0:
+        return False
+
+    return True
 
 
 def shutdown():
@@ -571,12 +617,8 @@ def truncate_table(s, table_name: str, ignore_constraints=False):
     return result
 
 
-def reset(keep_user=None, archive_dir=None):
+def reset(archive_dir=None):
     LOG.info(f'--- BEGINNING RESET ---')
-
-    if keep_user is not None:
-        assert isinstance(keep_user, User)
-        LOG.debug(f'keeping account {keep_user.uid}')
 
     # 1. Open a new DB transaction
     with session.begin():
@@ -652,14 +694,7 @@ def reset(keep_user=None, archive_dir=None):
         # 6. Purge all run logs
         truncate_table(session, RunLog.__tablename__)
 
-        # 7. Remove all users (except for keep_user, if given)
-        if keep_user is None:
-            truncate_table(session, User.__tablename__, ignore_constraints=True)
-        else:
-            users = session.query(User).all()
-
-            for user in users:
-                if user != keep_user:
-                    session.delete(user)
+        # 7. Remove all users
+        truncate_table(session, User.__tablename__, ignore_constraints=True)
 
     LOG.info(f'--- RESET COMPLETED ---')
