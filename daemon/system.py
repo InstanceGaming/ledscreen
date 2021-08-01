@@ -1,21 +1,21 @@
 import json
 import logging
 import os
+import re
 import signal
 import subprocess
 import sys
 import shutil
 import pathlib
 import threading
-
 import zmq
-
+import spreadsheets as ss
 import utils
 import ipc
+import common
 from datetime import datetime as dt
 from typing import Callable, Union, Tuple
 from api import Screen
-from common import CONFIG
 from distutils.errors import DistutilsError
 from distutils.dir_util import copy_tree
 from sqlalchemy import text as sql_text
@@ -50,11 +50,32 @@ def stop_pluggram(pluggram: PluggramMeta):
     pause_pluggram(pluggram, clear_screen=True)
 
 
+USERNAME_PATTERN = re.compile('[^A-Za-z- ]+')
+
+
+def validate_username(value):
+    if value is not None:
+        if isinstance(value, str):
+            if 1 < len(value) < 40:
+                if not USERNAME_PATTERN.search(value):
+                    return True
+    return False
+
+
+def validate_password(value):
+    if value is not None:
+        if isinstance(value, str):
+            if 6 <= len(value) < 64:
+                return True
+    return False
+
+
 def create_user(user_type: UserType,
                 user_name: str,
                 expiry=None,
                 password=None,
-                lock=False):
+                lock=False,
+                comment=None):
     uid = generate_user_token_safe()
     short_text = uid[:16]
 
@@ -66,9 +87,10 @@ def create_user(user_type: UserType,
 
         user = User(uid,
                     user_type,
-                    user_name,
+                    user_name.capitalize(),
                     expiry=expiry,
                     password=password,
+                    comment=comment,
                     lock=lock)
         session.add(user)
 
@@ -126,22 +148,59 @@ def mk_virtual_env(path: str,
     return return_code
 
 
+def pip_install(pip_path: str,
+                module_name: str):
+    assert isinstance(pip_path, str)
+    assert isinstance(module_name, str)
+
+    args = [
+        pip_path,
+        'install',
+        module_name
+    ]
+
+    LOG.debug(f'running "{pip_path} install {module_name}"...')
+    proc = subprocess.Popen(args)
+    return_code = proc.wait(20)
+    LOG.debug(f'pip return-code {return_code}')
+
+    return return_code
+
+
 def get_virtualenv_bin(env_dir: str):
     if sys.platform == "win32":
         return os.path.join(env_dir, 'Scripts')
     return os.path.join(env_dir, 'bin')
 
 
-def create_workspace(envs_dir: str,
-                     storage_dir: str,
-                     run_dir: str,
-                     py_filename: str,
+def get_pip_name():
+    if sys.platform == "win32":
+        return 'pip.exe'
+    return 'pip'
+
+
+def create_workspace(envs_dir=None,
+                     storage_dir=None,
+                     run_dir=None,
+                     py_filename=None,
                      py_contents=None,
                      owner=None,
                      run_privilege=None,
                      max_runtime=None):
     wid = generate_workspace_token_safe()
     short_text = wid[:16]
+
+    if envs_dir is None:
+        envs_dir = common.CONFIG['sandbox.envs_dir']
+
+    if storage_dir is None:
+        storage_dir = common.CONFIG['sandbox.storage_dir']
+
+    if run_dir is None:
+        run_dir = common.CONFIG['sandbox.run_dir']
+
+    if py_filename is None:
+        py_filename = common.CONFIG['sandbox.entrypoint']
 
     if not os.path.isdir(envs_dir):
         raise RuntimeError('Environments directory does not exist')
@@ -161,13 +220,16 @@ def create_workspace(envs_dir: str,
     if max_runtime is not None and max_runtime < 1:
         raise ValueError('max_runtime: must be at least 1')
 
+    # todo: robust error handling & consider filesystem fullness
+    # 8gb filesystem, ~2gb reserved for OS, 6gb free: ~65 workspaces max
+
     with session.begin():
         LOG.debug(f'creating workspace {short_text}')
 
         run_dir = os.path.abspath(run_dir)
 
         env_path = os.path.abspath(os.path.join(envs_dir, wid))
-        LOG.debug(f'environment will be at "{env_path}"')
+        LOG.debug(f'environment is at "{env_path}"')
         os.makedirs(env_path, exist_ok=True)
 
         venv_return_code = mk_virtual_env(env_path, short_text)
@@ -178,16 +240,58 @@ def create_workspace(envs_dir: str,
         current_interpreter_name = pathlib.Path(sys.executable).name
         bin_path = get_virtualenv_bin(env_path)
         interpreter_path = os.path.abspath(os.path.join(bin_path, current_interpreter_name))
-        LOG.debug(f'interpreter will be at "{interpreter_path}"')
+        LOG.debug(f'interpreter is at "{interpreter_path}"')
 
-        # todo: install ledscreen module
+        api_dist_path = os.path.abspath(common.CONFIG['sandbox.api_dist'])
+
+        if os.path.exists(api_dist_path):
+            pip_path = os.path.join(bin_path, get_pip_name())
+
+            if os.path.exists(pip_path):
+                LOG.debug(f'pip is at "{pip_path}"')
+
+                # intentionally hardcoded module install: zmq
+                pip_return_code = pip_install(pip_path, 'zmq')
+
+                if pip_return_code == 0:
+                    LOG.debug(f'installed zeroMQ module')
+                else:
+                    LOG.warning(f'failed to install zeroMQ for {short_text}: return code {pip_return_code}')
+
+                # todo: remove hard coded module, make pip pull in dependencies for ledscreen module itself?
+                # todo: find a way to drastically decrease env size...symlinking? ~90MB per rn.
+
+                pip_return_code = pip_install(pip_path, api_dist_path)
+
+                if pip_return_code == 0:
+                    LOG.debug(f'installed API module')
+                else:
+                    LOG.warning(f'failed to install API module for {short_text}: return code {pip_return_code}')
+
+                default_module_names = common.CONFIG['sandbox.default_modules']
+                LOG.debug(f'installing {len(default_module_names)} other default modules...')
+
+                for default_module in default_module_names:
+                    pip_return_code = pip_install(pip_path, default_module)
+
+                    if pip_return_code == 0:
+                        LOG.debug(f'installed "{default_module}"')
+                    else:
+                        LOG.warning(f'failed to install module "{default_module}" for {short_text}: '
+                                    f'return code {pip_return_code}')
+            else:
+                LOG.warning(f'pip not found at "{pip_path}"; '
+                            f'will not configure default modules for {short_text}')
+        else:
+            LOG.warning(f'API module distribution file not found at "{api_dist_path}"; '
+                        f'will not configure default modules for {short_text}')
 
         storage_path = os.path.abspath(os.path.join(storage_dir, wid))
         LOG.debug(f'storage will be at "{interpreter_path}"')
         os.makedirs(storage_path, exist_ok=True)
 
         entrypoint_path = os.path.join(storage_path, py_filename)
-        LOG.debug(f'entrypoint will be at "{entrypoint_path}"')
+        LOG.debug(f'entrypoint is at "{entrypoint_path}"')
 
         if py_contents is not None:
             with open(entrypoint_path, 'w') as ef:
@@ -302,7 +406,7 @@ def complete_run_log(rid: str,
 
 
 def clean_run_dir():
-    run_dir = os.path.abspath(CONFIG['sandbox.run_dir'])
+    run_dir = os.path.abspath(common.CONFIG['sandbox.run_dir'])
 
     if os.path.isdir(run_dir):
         LOG.debug(f'cleaning run directory')
@@ -324,6 +428,7 @@ def run_workspace(w, screen: Screen, exit_cb: Callable) -> Tuple:
     :param exit_cb: a :class:`Callable` with 4 arguments (rid, return_code, stdout, stderr)
     :return: a :class:`Thread` instance or None
     """
+
     def _run_program(_rid: str,
                      _intp: str,
                      _runp: str,
@@ -408,9 +513,10 @@ def run_workspace(w, screen: Screen, exit_cb: Callable) -> Tuple:
         # mark workspace as STARTING and set target
         with session.begin():
             workspace.run_status = RunStatus.STARTING
-            workspace.run_target = RunTarget.SCREEN if run_on_screen else RunTarget.SIM
+            workspace.run_target = RunTarget.SCREEN if run_on_screen else RunTarget.SIMULATE
 
         # 2. Copy files from storage to run directory
+        # todo: clear run directory
         try:
             copy_tree(storage_dir,
                       run_dir,
@@ -442,7 +548,7 @@ def run_workspace(w, screen: Screen, exit_cb: Callable) -> Tuple:
         # 4. Start IPC server
         LOG.info('starting IPC server...')
 
-        rx_uri = CONFIG['ipc.rx']
+        rx_uri = common.CONFIG['ipc.rx']
         zmq_context = zmq.Context()
 
         try:
@@ -453,7 +559,7 @@ def run_workspace(w, screen: Screen, exit_cb: Callable) -> Tuple:
             LOG.error(f'IPC error while binding: {str(e)}')
 
         # 5. Start program with timeout (if set)
-        timeout = workspace.max_runtime
+        timeout = workspace.max_runtime  # perhaps ignore this when simulating?
         client_port = utils.get_url_port(rx_uri)
 
         thread = threading.Thread(target=_run_program,
@@ -563,6 +669,40 @@ def remove_workspace(w):
     return False
 
 
+def bulk_create_students(roster_data: dict):
+    assert sorted(roster_data.keys()) == sorted(ss.IMPORT_COLUMN_NAMES)
+
+    usernames = roster_data[ss.USERNAME_HEADER]
+    passwords = roster_data[ss.PASSWORD_HEADER]
+    expire_dates = roster_data[ss.EXPIRY_HEADER]
+    lock_states = roster_data[ss.LOCK_HEADER]
+    run_privileges = roster_data[ss.RUN_PRIVILEGE_HEADER]
+    max_runtimes = roster_data[ss.MAX_RUNTIME_HEADER]
+    comments = roster_data[ss.COMMENT_HEADER]
+    count = len(usernames)
+
+    LOG.info(f'creating {count} student accounts in bulk')
+
+    for (username,
+         password,
+         expire_date,
+         lock_state,
+         run_privilege,
+         max_runtime,
+         comment) in zip(usernames, passwords, expire_dates, lock_states, run_privileges, max_runtimes, comments):
+        user = create_user(UserType.STUDENT,
+                           username,
+                           expiry=expire_date,
+                           password=password,
+                           lock=lock_state,
+                           comment=comment)
+        create_workspace(owner=user.uid,
+                         run_privilege=run_privilege,
+                         max_runtime=max_runtime)
+
+    return count
+
+
 def needs_setup() -> bool:
     with session.begin():
         count = session.query(User).count()
@@ -591,11 +731,9 @@ def restart():
     # todo: show message on screen
 
     if os.name == 'posix':
-        args = ['reboot']
         LOG.info(f'restarting...')
-        proc = subprocess.Popen(args)
-        return_code = proc.wait(2)
-        LOG.debug(f'reboot return-code {return_code}')
+        proc = subprocess.Popen(['reboot'])
+        proc.wait()
     else:
         raise NotImplementedError('Intentionally left unimplemented; this system is only used on Linux')
 
@@ -617,7 +755,7 @@ def truncate_table(s, table_name: str, ignore_constraints=False):
     return result
 
 
-def reset(archive_dir=None):
+def reset(archive=False):
     LOG.info(f'--- BEGINNING RESET ---')
 
     # 1. Open a new DB transaction
@@ -631,9 +769,10 @@ def reset(archive_dir=None):
 
         workspaces = session.query(Workspace).all()
         # 3. Make backup of student code
-        if archive_dir is not None:
+        if archive:
             import zipfile
 
+            archive_dir = common.CONFIG['app.archive_dir']
             os.makedirs(archive_dir, exist_ok=True)
             for workspace in workspaces:
                 storage_dir = workspace.storage_path
@@ -646,7 +785,7 @@ def reset(archive_dir=None):
                         workspace_user = workspace.owner
 
                         if workspace_user is not None:
-                            archive_name = f'{archive_date_code}-U{workspace_user.uid}.zip'
+                            archive_name = f'{archive_date_code}-U{workspace_user}.zip'
                         else:
                             archive_name = f'{archive_date_code}-W{workspace.short_wid}.zip'
 
@@ -659,7 +798,6 @@ def reset(archive_dir=None):
                             'wid': workspace.wid,
                             'uid': workspace_user.uid if workspace_user is not None else None,
                             'created_at': workspace.created_at.isoformat(),
-                            'opened_at': workspace.opened_at.isoformat(),
                             'archived_at': dt.utcnow().isoformat(),
                             'entrypoint': workspace.py_file,
                             'interpreter': pathlib.Path(workspace.interpreter_path).name,

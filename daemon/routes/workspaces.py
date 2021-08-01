@@ -15,16 +15,14 @@ bp = Blueprint('workspaces', __name__, url_prefix='/workspace')
 def workspace(wid):
     with session.begin():
         workspace = Workspace.query.get(wid)
-        user = False
 
-        if workspace is not None:
-            uid = workspace.owner
-            if uid is not None:
-                user = True
-                auth_or_login(minimum_credential=UserType.STUDENT)
+    user = False
 
-        workspace.opened_at = dt.utcnow()
-        return render_template(common.USER_WORKSPACE_TEMPLATE, user=user)
+    if workspace is not None:
+        uid = workspace.owner
+        if uid is not None:
+            user = True
+            auth_or_login(minimum_credential=UserType.STUDENT)
 
-
-
+    workspace.opened_at = dt.utcnow()
+    return render_template(common.USER_WORKSPACE_TEMPLATE, user=user)

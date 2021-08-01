@@ -7,7 +7,6 @@ import inspect
 from inspect import Parameter
 from enum import IntEnum
 
-
 LOG = logging.getLogger('ledscreen.pluggram')
 
 
@@ -234,13 +233,13 @@ def load(programs_dir: str, argument_count):
 
                         if pluggram_module_class is None:
                             LOG.warning(f'disqualifying module {module_name}: '
-                                            'module does not define a class inheriting Pluggram')
+                                        'module does not define a class inheriting Pluggram')
                             continue
 
                         # 3. ensure the class has a constructor
                         if not hasattr(pluggram_module_class, '__init__'):
                             LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                            'does not define a constructor')
+                                        'does not define a constructor')
                             continue
 
                         # 4. note argument count
@@ -254,8 +253,8 @@ def load(programs_dir: str, argument_count):
 
                         if positional_count > argument_count:
                             LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                            f'constructor positional arguments mismatch ({positional_count} wanted, '
-                                            f'{argument_count} exist)')
+                                        f'constructor positional arguments mismatch ({positional_count} wanted, '
+                                        f'{argument_count} exist)')
                             continue
 
                         # 5. collect metadata
@@ -277,7 +276,7 @@ def load(programs_dir: str, argument_count):
                                 option_definitions = pluggram_module_class.OPTIONS
                             else:
                                 LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                                f'"OPTIONS" property is not a list')
+                                            f'"OPTIONS" property is not a list')
                                 continue
 
                         pluggram_metas.append(PluggramMeta(loaded_module,
@@ -290,6 +289,6 @@ def load(programs_dir: str, argument_count):
                                                            positional_count,
                                                            options=option_definitions))
 
-                        LOG.info(f'loaded pluggram {module_name}.{class_name} ("{module_path}")')
+                        LOG.info(f'loaded pluggram {class_name} ("{module_path}")')
 
     return pluggram_metas

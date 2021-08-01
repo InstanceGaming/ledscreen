@@ -29,16 +29,17 @@ SESSION_EXP_AGE = timedelta(hours=1)
 
 
 def check_user_valid(user: User):
-    if user is not None:
-        if user.expires_at is None or user.expires_at < datetime.utcnow():
-            if not user.locked:
-                return True
-            else:
-                LOG.debug(f'user validate: "{user.uid}" is not active')
-        else:
-            LOG.debug(f'user validate: "{user.uid}" has expired')
+    if not user.locked:
+        if user.expires_at is None:
+            return True
 
-    LOG.debug(f'user validate: not valid')
+        if datetime.utcnow() > user.expires_at:
+            LOG.debug(f'user validate: "{user.uid}" has expired')
+        else:
+            return True
+    else:
+        LOG.debug(f'user validate: "{user.uid}" is locked')
+
     return False
 
 
@@ -177,8 +178,10 @@ def logout():
             with session.begin():
                 user = User.query.get(session_entry.owner)
                 user.logout_at = datetime.utcnow()
+                delta = user.logout_at - user.login_at
+                user.online_duration = delta.total_seconds()
 
-                LOG.info(f'logging out out {user.uid} from session {session_entry.sid[:16]}')
+                LOG.info(f'logging out {user.uid} from session {session_entry.sid[:16]}')
                 session.delete(session_entry)
             return redirect(url_for(common.LOGIN_PAGE, mid=int(LoginMessage.LOGGED_OUT)))
 
@@ -199,6 +202,7 @@ def create_user_session(user, auth_result=None):
         session_entry = Session(sid, user.uid, expiration)
         session.add(session_entry)
         user.login_at = current_time
+        user.login_count = user.login_count + 1
 
     LOG.info(f'authenticated {user.uid} with session {sid[:16]}')
 

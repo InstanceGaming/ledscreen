@@ -45,7 +45,7 @@ def create_app():
     app.secret_key = config['app.secret']
     app.wsgi_app = ProxyFix(app.wsgi_app)
 
-    common.init(app, config, programs)
+    common.init_flask(app, config, programs)
     LOG.debug('initialized common objects')
 
     # todo: show version text on screen

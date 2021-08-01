@@ -1,3 +1,4 @@
+import datetime
 import subprocess
 import threading
 import time
@@ -5,13 +6,33 @@ import random
 import os
 import pytoml
 import logging
+import dateparser as dp
 from urllib.parse import urlparse
 from dotted.collection import DottedDict
-from typing import Tuple, Union, NoReturn, Callable
-
+from typing import Tuple, Union, NoReturn, Callable, Iterable
 
 LOG = logging.getLogger('ledscreen.utils')
 MAX_COLORS = 16777215
+
+
+def parse_account_expiry(raw_value):
+    if raw_value is not None:
+        if isinstance(raw_value, str):
+            try:
+                return dp.parse(raw_value,
+                                locales=['en'],
+                                settings={
+                                    'TIMEZONE': 'UTC',
+                                    'PREFER_DATES_FROM': 'future',
+                                    'PARSERS': [
+                                        'absolute-time'
+                                    ]
+                                })
+            except ValueError as e:
+                LOG.debug(f'failed to parse expiry text: {str(e)}')
+        elif isinstance(raw_value, datetime.datetime):
+            return raw_value
+    return None
 
 
 def get_url_port(url_text: str) -> Union[None, int]:
@@ -76,6 +97,12 @@ def load_config():
     _config_node_or_exit(config, 'sandbox.user_id')
     _config_node_or_exit(config, 'sandbox.group_id')
     _config_node_or_exit(config, 'sandbox.entrypoint')
+    _config_node_or_exit(config, 'sandbox.api_dist')
+    _config_node_or_exit(config, 'sandbox.default_modules')
+
+    if not isinstance(config['sandbox.default_modules'], Iterable):
+        LOG.error(f'{config_path}: "sandbox.default_modules" must be iterable')
+        exit(3)
 
     _config_node_or_exit(config, 'database')
     _config_node_or_exit(config, 'database.uri')
@@ -93,7 +120,7 @@ def load_config():
     _config_node_or_exit(config, 'ipc.rx')
 
     if get_url_port(config['ipc.rx']) is None:
-        LOG.error(f'"ipc.rx" must define a port number')
+        LOG.error(f'{config_path}: "ipc.rx" must define a port number')
         exit(3)
 
     return config

@@ -2,7 +2,7 @@ import argparse
 import sys
 import zmq
 import enum
-from .ipc_common import decode, SessionInfoFrame, ScreenInfoFrame
+from .ipc_common import decode
 from .api import Screen
 from .utils import *
 

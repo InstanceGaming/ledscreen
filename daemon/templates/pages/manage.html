@@ -190,18 +190,16 @@
                         <div class="card-panel card-body">
                             {% if students|length > 0 %}
                             <div class="my-2">
-                                <div class="float-end">
-                                    <button type="button" class="btn btn-outline-primary" title="Upload CSV"
-                                            id="import-csv-btn">
-                                        <i class="bi-upload" role="img"
-                                           aria-label="Upload CSV"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-outline-primary" title="Download CSV"
-                                            id="export-csv-btn">
-                                        <i class="bi-download" role="img"
-                                           aria-label="Download CSV"></i>
-                                    </button>
-                                </div>
+                                <button type="button" class="btn btn-outline-primary" title="Upload CSV"
+                                        id="import-csv-btn">
+                                    <i class="bi-upload" role="img"
+                                       aria-label="Upload CSV"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" title="Download CSV"
+                                        id="export-csv-btn">
+                                    <i class="bi-download" role="img"
+                                       aria-label="Download CSV"></i>
+                                </button>
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle">
@@ -209,6 +207,7 @@
                                         <th scope="col" style="width: 12%;">Code</th>
                                         <th scope="col">Name</th>
                                         <th scope="col">Status</th>
+                                        <th scope="col">Comment</th>
                                         <th scope="col" class="text-end">Actions</th>
                                     </tr>
                                     {% for student in students %}
@@ -227,6 +226,7 @@
                                             {% endif %}
                                             <small>Online for 23min</small>
                                         </td>
+                                        <td>{{ student.admin_comment }}</td>
                                         <td>
                                             <div class="btn-group float-end" role="group"
                                                  aria-label="Student row actions">

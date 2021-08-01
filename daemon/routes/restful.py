@@ -24,7 +24,7 @@ class ResetSystem(Resource):
             auth_result = get_auth_status()
 
             if auth_result is not None and auth_result.valid:
-                system.reset(keep_user=auth_result.user, archive_dir=CONFIG['app.archive_dir'])
+                system.reset(True)
 
                 try:
                     system.restart()
@@ -54,7 +54,6 @@ class Workspaces(Resource):
         payload = {
             'workspace': workspace.wid,
             'created_at': isoformat_or_null(workspace.created_at),
-            'opened_at': isoformat_or_null(workspace.opened_at),
             'run_privilege': enum_name_or_null(workspace.run_privilege),
             'max_runtime': workspace.max_runtime,
             'run_target': enum_name_or_null(workspace.run_target),
@@ -104,7 +103,7 @@ class RunWorkspace(Resource):
             payload = {
                 'workspace': workspace.wid,
                 'run_log': rid,
-                'simulating': workspace.run_privilege == RunTarget.SIM
+                'simulating': workspace.run_privilege == RunTarget.SIMULATE
             }
             return payload, 200
         else:
@@ -185,16 +184,7 @@ class CreateWorkspace(Resource):
             except ValueError:
                 return {'message': 'cannot parse max_runtime'}, 400
 
-        envs_dir = CONFIG['sandbox.envs_dir']
-        storage_dir = CONFIG['sandbox.storage_dir']
-        run_dir = CONFIG['sandbox.run_dir']
-        py_filename = CONFIG['sandbox.entrypoint']
-
-        workspace = system.create_workspace(envs_dir,
-                                            storage_dir,
-                                            run_dir,
-                                            py_filename,
-                                            py_contents=content,
+        workspace = system.create_workspace(py_contents=content,
                                             owner=owner_uid,
                                             run_privilege=run_privilege,
                                             max_runtime=max_runtime)

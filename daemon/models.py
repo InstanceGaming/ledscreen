@@ -45,6 +45,8 @@ class User(Base):
     password = Column(Unicode(64), nullable=True)
     login_at = Column(DateTime(), nullable=True)
     logout_at = Column(DateTime(), nullable=True)
+    login_count = Column(Integer(), nullable=False, default=0)
+    online_duration = Column(Integer(), nullable=False, default=0)
     admin_comment = Column(UnicodeText(), nullable=True)
 
     def __init__(self,
@@ -54,15 +56,17 @@ class User(Base):
                  expiry=None,
                  password=None,
                  lock=False,
+                 comment=None,
                  datetime=None):
         current_datetime = datetime or dt.utcnow()
 
         self.uid = uid
         self.issued_at = current_datetime
         self.type = type
-        self.user_name = user_name
+        self.user_name = user_name.strip()
         self.expires_at = expiry
         self.password = password
+        self.admin_comment = comment
 
         if lock:
             self.locked_at = current_datetime
@@ -98,7 +102,7 @@ class Session(Base):
 
 
 class RunTarget(enum.IntEnum):
-    SIM = 1
+    SIMULATE = 1
     SCREEN = 2
 
 
@@ -127,7 +131,6 @@ class Workspace(Base):
     max_runtime = Column(Integer(), nullable=True)
     run_target = Column(Enum(RunTarget), nullable=True)
     run_status = Column(Enum(RunStatus), nullable=False, server_default=RunStatus.IDLE.name)
-    opened_at = Column(DateTime(), nullable=True)
 
     owner = Column(String(8),
                    ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),

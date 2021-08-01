@@ -10,7 +10,7 @@ SCREEN = None
 THREADS = []
 
 
-def init(app, config, programs):
+def init_flask(app, config, programs):
     global LIMITER, CONFIG, PROGRAMS, SCREEN
     LIMITER.init_app(app)
     CONFIG = config
@@ -25,6 +25,11 @@ def init(app, config, programs):
         CONFIG['screen.inverted'],
         CONFIG['screen.gpio_channel']
     )
+
+
+def init_minimum(config):
+    global CONFIG
+    CONFIG = config
 
 
 LOGIN_PAGE = 'auth.login'

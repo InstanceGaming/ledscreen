@@ -2,16 +2,12 @@ import logging
 from flask import (Blueprint,
                    request,
                    render_template,
-                   redirect,
-                   make_response,
-                   url_for,
                    abort)
 import enum
 import system
 from common import WELCOME_TEMPLATE, SETUP_TEMPLATE
-from database import session
-from models import User, UserType
-from .authentication import check_password, create_user_session, respond_with_cookie
+from models import UserType
+from .authentication import create_user_session, respond_with_cookie
 
 LOG = logging.getLogger('ledscreen.web.oobe')
 bp = Blueprint('oobe', __name__, url_prefix='/oobe')
@@ -27,7 +23,7 @@ def welcome():
 
 
 class SetupMessage(enum.IntEnum):
-    USERNAME_LENGTH = 1
+    BAD_USERNAME = 1
     PASSWORD_CONFIRM_MISMATCH = 2
     EMPTY_FIELD = 3
     PASSWORD_LENGTH = 4
@@ -46,11 +42,11 @@ def setup():
             return render_template(SETUP_TEMPLATE,
                                    mid=SetupMessage.EMPTY_FIELD)
 
-        if len(user_name) > 40 or len(user_name) < 2:
+        if not system.validate_username(user_name):
             return render_template(SETUP_TEMPLATE,
-                                   mid=SetupMessage.USERNAME_LENGTH)
+                                   mid=SetupMessage.BAD_USERNAME)
 
-        if len(password) > 64 or len(password) < 6:
+        if not system.validate_password(password):
             return render_template(SETUP_TEMPLATE,
                                    mid=SetupMessage.PASSWORD_LENGTH)
 
