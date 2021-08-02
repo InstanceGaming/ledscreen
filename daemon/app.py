@@ -1,35 +1,24 @@
+import eventlet
+eventlet.monkey_patch()
+
 import signal
 import flask
 import logging
 import common
 import database
 import pluggram
-from utils import load_config
+import wsio
+from utils import load_config, configure_logger
 from flask_minify import minify
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 
-def configure_logger(log):
-    handler = logging.StreamHandler()
-
-    # noinspection PyUnreachableCode
-    if __debug__:
-        log.setLevel(logging.DEBUG)
-        handler.setFormatter(
-            logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
-                              datefmt='%x %H:%M:%S',
-                              style='{'))
-    else:
-        log.setLevel(logging.INFO)
-        handler.setFormatter(logging.Formatter('{levelname:>8}: {message}', style='{'))
-
-    log.handlers.clear()
-    log.addHandler(handler)
-
-
 LOG = logging.getLogger('ledscreen')
 configure_logger(LOG)
+# configure_logger(logging.getLogger('werkzeug'), prod_level=logging.WARNING)
+configure_logger(logging.getLogger('sqlalchemy'), prod_level=logging.WARNING)
+configure_logger(logging.getLogger('sqlalchemy.engine.Engine'), prod_level=logging.WARNING)
 
 
 def create_app():
@@ -50,12 +39,12 @@ def create_app():
 
     # todo: show version text on screen
 
-    from routes import authentication, management, workspaces, restful, oobe
+    from routes import authentication, management, workspaces, endpoints, oobe
 
     app.register_blueprint(authentication.bp)
     app.register_blueprint(management.bp)
     app.register_blueprint(workspaces.bp)
-    app.register_blueprint(restful.bp)
+    app.register_blueprint(endpoints.bp)
     app.register_blueprint(oobe.bp)
     LOG.debug('registered blueprints')
 
@@ -70,14 +59,13 @@ def create_app():
         LOG.debug('minification enabled')
         minify(app)
 
-    # configure Werkzeug logger to be quiet
-    werk_log = logging.getLogger('werkzeug')
-    werk_log.setLevel(logging.WARNING)
+    socketio = wsio.init_flask(app)
+    LOG.debug('initialized socket io')
 
-    return app, config
+    return socketio, app, config
 
 
-application, configuration = create_app()
+sio, application, configuration = create_app()
 
 
 def _signal_interrupt(_a, _b):
@@ -86,8 +74,7 @@ def _signal_interrupt(_a, _b):
 
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, _signal_interrupt)
-
-    application.run(
-        configuration['development_server.host'],
-        configuration['development_server.port']
-    )
+    host = configuration['development_server.host']
+    port = configuration['development_server.port']
+    LOG.info(f'starting development server {host}:{port}')
+    sio.run(application, host=host, port=port)

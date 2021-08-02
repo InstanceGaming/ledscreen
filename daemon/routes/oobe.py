@@ -6,8 +6,8 @@ from flask import (Blueprint,
 import enum
 import system
 from common import WELCOME_TEMPLATE, SETUP_TEMPLATE
-from models import UserType
-from .authentication import create_user_session, respond_with_cookie
+from models import UserType, RunTarget
+from .authentication import create_user_auth_session, respond_with_cookie
 
 LOG = logging.getLogger('ledscreen.web.oobe')
 bp = Blueprint('oobe', __name__, url_prefix='/oobe')
@@ -54,11 +54,13 @@ def setup():
             return render_template(SETUP_TEMPLATE,
                                    mid=SetupMessage.PASSWORD_CONFIRM_MISMATCH)
 
+        workspace = system.create_workspace(run_privilege=RunTarget.SCREEN)
         user = system.create_user(UserType.ADMIN,
                                   user_name,
+                                  workspace.wid,
                                   password=password)
-        sid, expiration = create_user_session(user)
-        return respond_with_cookie(sid,
+        aid, expiration = create_user_auth_session(user)
+        return respond_with_cookie(aid,
                                    expiration,
                                    render_template(SETUP_TEMPLATE, completed=True, uid=user.uid))
     else:

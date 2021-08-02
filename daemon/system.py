@@ -9,29 +9,33 @@ import shutil
 import pathlib
 import threading
 import zmq
+import database
 import spreadsheets as ss
+import stats
 import utils
 import ipc
 import common
 from datetime import datetime as dt
-from typing import Callable, Union, Tuple
+from typing import Callable, Tuple
+
+import wsio
 from api import Screen
 from distutils.errors import DistutilsError
 from distutils.dir_util import copy_tree
-from sqlalchemy import text as sql_text
-from database import session, conditional_context
+from database import session
 from models import (User,
                     UserType,
                     Workspace,
                     RunTarget,
                     generate_workspace_token_safe,
                     generate_user_token_safe,
-                    Session,
+                    AuthSession,
                     RunStatus,
                     RunLog,
                     generate_run_log_token_safe,
                     ExitReason)
 from pluggram import PluggramMeta
+
 
 VERSION = '1.0.0'
 LOG = logging.getLogger('ledscreen.system')
@@ -72,6 +76,7 @@ def validate_password(value):
 
 def create_user(user_type: UserType,
                 user_name: str,
+                wid: str,
                 expiry=None,
                 password=None,
                 lock=False,
@@ -88,12 +93,14 @@ def create_user(user_type: UserType,
         user = User(uid,
                     user_type,
                     user_name.capitalize(),
+                    wid,
                     expiry=expiry,
                     password=password,
                     comment=comment,
                     lock=lock)
         session.add(user)
 
+    # todo: update admin panel stats here
     LOG.info(f'created user {short_text}')
     return user
 
@@ -184,7 +191,6 @@ def create_workspace(envs_dir=None,
                      run_dir=None,
                      py_filename=None,
                      py_contents=None,
-                     owner=None,
                      run_privilege=None,
                      max_runtime=None):
     wid = generate_workspace_token_safe()
@@ -307,7 +313,6 @@ def create_workspace(envs_dir=None,
                               run_dir,
                               interpreter_path,
                               py_file=py_filename,
-                              owner=owner,
                               run_privilege=run_privilege,
                               max_runtime=max_runtime)
 
@@ -401,6 +406,8 @@ def complete_run_log(rid: str,
             log.exit_reason = reason
             log.stopped_at = datetime or dt.utcnow()
             LOG.debug(f'completed run log {log.short_rid}')
+
+            # todo: update admin panel stats here
         else:
             raise RuntimeError('Bad RID')
 
@@ -690,15 +697,15 @@ def bulk_create_students(roster_data: dict):
          run_privilege,
          max_runtime,
          comment) in zip(usernames, passwords, expire_dates, lock_states, run_privileges, max_runtimes, comments):
-        user = create_user(UserType.STUDENT,
-                           username,
-                           expiry=expire_date,
-                           password=password,
-                           lock=lock_state,
-                           comment=comment)
-        create_workspace(owner=user.uid,
-                         run_privilege=run_privilege,
-                         max_runtime=max_runtime)
+        workspace = create_workspace(run_privilege=run_privilege,
+                                     max_runtime=max_runtime)
+        create_user(UserType.STUDENT,
+                    username,
+                    workspace.wid,
+                    expiry=expire_date,
+                    password=password,
+                    lock=lock_state,
+                    comment=comment)
 
     return count
 
@@ -738,37 +745,25 @@ def restart():
         raise NotImplementedError('Intentionally left unimplemented; this system is only used on Linux')
 
 
-def execute_sql(s, statement: str):
-    sql = sql_text(statement)
-    return s.execute(sql)
-
-
-def truncate_table(s, table_name: str, ignore_constraints=False):
-    if ignore_constraints:
-        execute_sql(s, 'SET FOREIGN_KEY_CHECKS=0')
-
-    result = execute_sql(s, f'TRUNCATE TABLE {table_name}')
-
-    if ignore_constraints:
-        execute_sql(s, 'SET FOREIGN_KEY_CHECKS=1')
-
-    return result
-
-
 def reset(archive=False):
     LOG.info(f'--- BEGINNING RESET ---')
 
-    # 1. Open a new DB transaction
-    with session.begin():
-        run_logs = session.query(RunLog).all()
+    if database.has_table(RunLog.__tablename__):
+        with session.begin():
+            run_logs = session.query(RunLog).all()
 
-        # 2. Force stop all running screen programs
+        # 1. Force stop all running screen programs
         for run_log in run_logs:
             if run_log.stopped_at is not None:
                 stop_run_log(run_log.rid)
 
-        workspaces = session.query(Workspace).all()
-        # 3. Make backup of student code
+        database.truncate_table(session, RunLog.__tablename__)
+
+    if database.has_table(Workspace.__tablename__):
+        with session.begin():
+            workspaces = session.query(Workspace).all()
+
+        # 2a. Make backup of student code
         if archive:
             import zipfile
 
@@ -782,20 +777,23 @@ def reset(archive=False):
 
                     if len(storage_files) > 0:
                         archive_date_code = dt.utcnow().strftime("%y%j")
-                        workspace_user = workspace.owner
+
+                        with session.begin():
+                            workspace_user = User.query.filter_by(wid=workspace.wid).first()
 
                         if workspace_user is not None:
-                            archive_name = f'{archive_date_code}-U{workspace_user}.zip'
+                            archive_name = f'{archive_date_code}-U{workspace_user.uid}.zip'
                         else:
                             archive_name = f'{archive_date_code}-W{workspace.short_wid}.zip'
 
                         archive_path = os.path.join(archive_dir, archive_name)
                         archive = zipfile.ZipFile(archive_path, 'w')
 
+                        wid = workspace.wid
                         manifest = {
                             'format': 1,
                             'system_version': VERSION,
-                            'wid': workspace.wid,
+                            'wid': wid,
                             'uid': workspace_user.uid if workspace_user is not None else None,
                             'created_at': workspace.created_at.isoformat(),
                             'archived_at': dt.utcnow().isoformat(),
@@ -810,7 +808,9 @@ def reset(archive=False):
 
                         for storage_file in storage_files:
                             if os.path.exists(storage_file):
-                                archive.write(storage_file, compress_type=zipfile.ZIP_DEFLATED)
+                                filename = pathlib.Path(storage_file).name
+                                archive_file_path = os.path.join(wid, filename)
+                                archive.write(archive_file_path, compress_type=zipfile.ZIP_DEFLATED)
 
                         archive.close()
                         LOG.debug(f'archived workspace {workspace.short_wid} '
@@ -822,17 +822,16 @@ def reset(archive=False):
                                 'storage directory does not exist or is not a directory')
                     continue
 
-        # 4. Purge all sessions
-        truncate_table(session, Session.__tablename__)
-
-        # 5. For each workspace, call remove_workspace()
+        # 2b. Purge workspace filesystem data
         for workspace in workspaces:
             remove_workspace(workspace)
 
-        # 6. Purge all run logs
-        truncate_table(session, RunLog.__tablename__)
+    # 3. Purge all sessions
+    if database.has_table(AuthSession.__tablename__):
+        database.truncate_table(session, AuthSession.__tablename__)
 
-        # 7. Remove all users
-        truncate_table(session, User.__tablename__, ignore_constraints=True)
+    # 4. Remove all users
+    if database.has_table(User.__tablename__):
+        database.truncate_table(session, User.__tablename__, ignore_constraints=True)
 
     LOG.info(f'--- RESET COMPLETED ---')

@@ -6,12 +6,14 @@ from flask import (Blueprint,
                    make_response,
                    url_for,
                    abort)
-from models import (Session,
+
+import wsio
+from models import (AuthSession,
                     User,
                     UserType,
                     Workspace,
-                    generate_session_token_safe,
-                    lookup_sid_cs)
+                    generate_auth_session_token_safe,
+                    lookup_aid_cs)
 from datetime import datetime, timedelta
 from database import session
 import system
@@ -43,11 +45,25 @@ def check_user_valid(user: User):
     return False
 
 
-def check_session_valid(s: Session):
-    short_text = s.sid[:16]
+def coerce_auth_session(s):
+    with session.begin():
+        if isinstance(s, str):
+            if len(s) != 64:
+                raise ValueError('Invalid AID')
+            sess = AuthSession.query.get(s)
+        elif isinstance(s, AuthSession):
+            sess = s
+        else:
+            raise TypeError('Must be a string or Session instance')
+        return sess
 
-    if s.expires_at > s.issued_at:
-        if s.expires_at > datetime.utcnow():
+
+def check_auth_session_valid(s):
+    sess = coerce_auth_session(s)
+    short_text = sess.aid[:16]
+
+    if sess.expires_at > sess.issued_at:
+        if sess.expires_at > datetime.utcnow():
             return True
         else:
             LOG.info(f'session validate: "{short_text}" has expired')
@@ -61,8 +77,8 @@ def check_session_valid(s: Session):
 class AuthResult:
 
     @property
-    def session(self) -> Session:
-        return self._session
+    def session(self) -> AuthSession:
+        return self._auth_session
 
     @property
     def user(self) -> User:
@@ -76,12 +92,12 @@ class AuthResult:
 
     @property
     def valid(self) -> bool:
-        return check_session_valid(self._session) and check_user_valid(self._user)
+        return check_auth_session_valid(self._auth_session) and check_user_valid(self._user)
 
-    def __init__(self, session: Session, user=None):
-        assert isinstance(session, Session)
+    def __init__(self, sess: AuthSession, user=None):
+        assert isinstance(sess, AuthSession)
         assert isinstance(user, User)
-        self._session = session
+        self._auth_session = sess
         self._user = user
 
 
@@ -89,7 +105,7 @@ def get_auth_status() -> Union[AuthResult, None]:
     cookie_value = request.cookies.get(COOKIE_KEY)
 
     if cookie_value is not None and len(cookie_value) > 0:
-        session_entry = lookup_sid_cs(cookie_value)
+        session_entry = lookup_aid_cs(cookie_value)
 
         if session_entry is not None:
             user = User.query.get(session_entry.owner)
@@ -97,7 +113,7 @@ def get_auth_status() -> Union[AuthResult, None]:
             if user is not None:
                 return AuthResult(session_entry, user)
             else:
-                LOG.warning(f'session "{session_entry.sid[:16]}" not associated with user')
+                LOG.warning(f'session "{session_entry.aid[:16]}" not associated with user')
 
     return None
 
@@ -173,7 +189,7 @@ def logout():
     cookie_value = request.cookies.get(COOKIE_KEY)
 
     if cookie_value is not None and len(cookie_value) > 0:
-        session_entry = lookup_sid_cs(cookie_value)
+        session_entry = lookup_aid_cs(cookie_value)
         if session_entry is not None:
             with session.begin():
                 user = User.query.get(session_entry.owner)
@@ -181,38 +197,40 @@ def logout():
                 delta = user.logout_at - user.login_at
                 user.online_duration = delta.total_seconds()
 
-                LOG.info(f'logging out {user.uid} from session {session_entry.sid[:16]}')
+                LOG.info(f'logging out {user.uid} from session {session_entry.aid[:16]}')
                 session.delete(session_entry)
+
+            # todo: update admin panel stats here
             return redirect(url_for(common.LOGIN_PAGE, mid=int(LoginMessage.LOGGED_OUT)))
 
     # default
     return redirect(url_for(common.LOGIN_PAGE))
 
 
-def create_user_session(user, auth_result=None):
+def create_user_auth_session(user, auth_result=None):
     with session.begin():
         if auth_result is not None and auth_result.valid:
             session.remove(auth_result.session)
 
-    sid = generate_session_token_safe()
+    aid = generate_auth_session_token_safe()
 
     with session.begin():
         current_time = datetime.utcnow()
         expiration = current_time + SESSION_EXP_AGE
-        session_entry = Session(sid, user.uid, expiration)
+        session_entry = AuthSession(aid, user.uid, expiration)
         session.add(session_entry)
         user.login_at = current_time
         user.login_count = user.login_count + 1
 
-    LOG.info(f'authenticated {user.uid} with session {sid[:16]}')
+    LOG.info(f'authenticated {user.uid} with session {aid[:16]}')
 
-    return sid, expiration
+    return aid, expiration
 
 
-def respond_with_cookie(sid, expiration, *content):
+def respond_with_cookie(aid, expiration, *content):
     response = make_response(*content)
     response.set_cookie(COOKIE_KEY,
-                        sid,
+                        aid,
                         expires=expiration,
                         samesite='Strict')
     return response
@@ -266,17 +284,19 @@ def login():
                                                            mid=LoginMessage.BAD_PASSWORD,
                                                            fill_code=form_code)
 
-                        sid, expiration = create_user_session(user)
+                        aid, expiration = create_user_auth_session(user)
+
+                        # todo: update admin panel stats here
 
                         if next_parameter is None:
                             destination = get_home_url(user)
                             if destination is None:
-                                response = respond_with_cookie(sid, expiration, 500)
+                                response = respond_with_cookie(aid, expiration, 500)
                             else:
-                                response = respond_with_cookie(sid, expiration, redirect(destination))
+                                response = respond_with_cookie(aid, expiration, redirect(destination))
                         else:
                             LOG.debug(f'redirecting according to next parameter "{next_parameter}"')
-                            response = respond_with_cookie(sid, expiration, redirect(next_parameter))
+                            response = respond_with_cookie(aid, expiration, redirect(next_parameter))
                         return response
                     else:
                         if user.locked:

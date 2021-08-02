@@ -1,12 +1,18 @@
 import argparse
+import logging
 import os
 import system
 import database
 import utils
 import spreadsheets as ss
 import common
-from utils import load_config
+from models import RunTarget
+from utils import load_config, configure_logger
 from sqlalchemy.exc import SQLAlchemyError
+
+
+configure_logger(logging.getLogger('sqlalchemy'), prod_level=logging.WARNING)
+configure_logger(logging.getLogger('sqlalchemy.engine.Engine'), prod_level=logging.WARNING)
 
 
 def pretty_roster_errors(errors):
@@ -21,11 +27,9 @@ def parse_args():
     subparsers = ap.add_subparsers(dest='command')
     sp_reset = subparsers.add_parser('reset')
     sp_reset.add_argument('--archive', '-a',
-                          type=str,
-                          nargs=1,
-                          metavar='DIRECTORY',
-                          dest='archive_dir',
-                          help='Archive user data to this directory.')
+                          action='store_true',
+                          dest='archive',
+                          help='Create archives of user data.')
     subparsers.add_parser('setup-db')
     sp_reset = subparsers.add_parser('import-students')
     sp_reset.add_argument(type=str,
@@ -56,6 +60,20 @@ def parse_args():
                                 action='store_true',
                                 dest='lock',
                                 help='Lock user account by default.')
+    sp_create_user.add_argument('-r',
+                                type=str,
+                                nargs=1,
+                                metavar='TARGET',
+                                dest='run_privilege',
+                                choices=RunTarget.names(),
+                                default=RunTarget.SIMULATE.name,
+                                help='Set user run privilege. Default is SIMULATE.')
+    sp_create_user.add_argument('-M',
+                                type=int,
+                                nargs=1,
+                                metavar='SECONDS',
+                                dest='max_runtime',
+                                help='Set user max run time.')
     sp_create_user.add_argument(type=str,
                                 dest='user_type',
                                 metavar='TYPE',
@@ -86,7 +104,7 @@ if __name__ == '__main__':
         try:
             import models
 
-            database.create_tables()
+            database.setup()
         except SQLAlchemyError as e:
             print(f'Database error: {e}')
             exit(100)
@@ -94,8 +112,7 @@ if __name__ == '__main__':
         print('Setup database successfully')
         exit(0)
     elif reset:
-        archive_dir = cla.archive_dir[0]
-        system.reset()
+        system.reset(cla.archive)
 
         print('Reset successful')
         exit(0)
@@ -124,9 +141,26 @@ if __name__ == '__main__':
         lock = cla.lock
         password = cla.password
 
+        run_privilege_text = cla.run_privilege
+
         try:
+            run_privilege = RunTarget[run_privilege_text.upper()]
+        except KeyError:
+            print('Invalid run privilege')
+            exit(202)
+
+        max_runtime = cla.max_runtime
+
+        if max_runtime is not None and max_runtime < 2:
+            print('Max runtime must be at least 2 seconds')
+            exit(203)
+
+        try:
+            workspace = system.create_workspace(run_privilege=run_privilege,
+                                                max_runtime=max_runtime)
             user = system.create_user(user_type,
                                       user_name,
+                                      workspace.wid,
                                       expiry=expiry,
                                       password=password,
                                       lock=lock)

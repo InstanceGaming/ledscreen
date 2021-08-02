@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
     <script src="/static/js/jquery.min.js"></script>
     <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/socket.io.min.js"></script>
+    <script src="/static/js/manage.js" defer></script>
     <style>
         body {
             background-color: #eee;
@@ -123,16 +125,7 @@
                             My Dashboard
                         </div>
                         <div class="card-body p-0">
-                            <div class="row justify-content-center">
-                                {% for name, value in statistics.items() %}
-                                <div class="col-3 my-2">
-                                    <div class="stat-box text-center">
-                                        <div class="stat-headline">{{ value }}</div>
-                                        <div class="stat-description mb-4">{{ name }}</div>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
+                            <div class="row justify-content-center" id="stats-container"></div>
                         </div>
                     </div>
                     {% if programs|length > 0 %}

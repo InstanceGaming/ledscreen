@@ -175,11 +175,10 @@ def validate_roster(roster_data: dict):
                     try:
                         RunTarget[value.upper()]
                     except KeyError:
-                        names = (t.name for t in RunTarget)
                         errors.append(ValidationError(ci,
                                                       ri,
                                                       RUN_PRIVILEGE_HEADER,
-                                                      f'invalid run privilege "{value}" (can be {", ".join(names)})'))
+                                                      f'invalid run privilege "{value}" (can be {", ".join(RunTarget.names())})'))
                 else:
                     errors.append(ValidationError(ci,
                                                   ri,

@@ -13,6 +13,25 @@ from typing import Tuple, Union, NoReturn, Callable, Iterable
 
 LOG = logging.getLogger('ledscreen.utils')
 MAX_COLORS = 16777215
+DEV_FORMATTER = logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
+                                  datefmt='%x %H:%M:%S',
+                                  style='{')
+FORMATTER = logging.Formatter('{levelname:>8}: {message}', style='{')
+
+
+def configure_logger(log, prod_level=logging.INFO):
+    handler = logging.StreamHandler()
+
+    # noinspection PyUnreachableCode
+    if __debug__:
+        log.setLevel(logging.DEBUG)
+        handler.setFormatter(DEV_FORMATTER)
+    else:
+        log.setLevel(logging.INFO)
+        handler.setFormatter(FORMATTER)
+
+    log.handlers.clear()
+    log.addHandler(handler)
 
 
 def parse_account_expiry(raw_value):

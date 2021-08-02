@@ -1,5 +1,8 @@
 from datetime import datetime as dt
-from typing import Union
+from typing import Union, Generator
+
+from sqlalchemy.orm import relationship, backref
+
 from utils import generate_sanitized_alphanumerics, generate_url_binary
 from sqlalchemy import (Column,
                         ForeignKey,
@@ -15,7 +18,6 @@ import enum
 import logging
 
 LOG = logging.getLogger('ledscreen.models')
-
 
 SESSION_TOKEN_LENGTH = 64
 RUN_LOG_TOKEN_LENGTH = 64
@@ -48,11 +50,14 @@ class User(Base):
     login_count = Column(Integer(), nullable=False, default=0)
     online_duration = Column(Integer(), nullable=False, default=0)
     admin_comment = Column(UnicodeText(), nullable=True)
+    wid = Column(String(32), ForeignKey('workspaces.wid', onupdate="CASCADE", ondelete="RESTRICT"))
+    workspace = relationship("Workspace", backref=backref("users", uselist=False))
 
     def __init__(self,
                  uid: str,
                  type: UserType,
                  user_name: str,
+                 wid: str,
                  expiry=None,
                  password=None,
                  lock=False,
@@ -63,6 +68,7 @@ class User(Base):
         self.uid = uid
         self.issued_at = current_datetime
         self.type = type
+        self.wid = wid
         self.user_name = user_name.strip()
         self.expires_at = expiry
         self.password = password
@@ -75,9 +81,10 @@ class User(Base):
         return f'<User {self.uid} name="{self.user_name}" type={self.type.name}>'
 
 
-class Session(Base):
-    __tablename__ = 'sessions'
-    sid = Column(String(64), primary_key=True)
+class AuthSession(Base):
+    __tablename__ = 'auth_sessions'
+
+    aid = Column(String(64), primary_key=True)
     issued_at = Column(DateTime(), nullable=False)
     expires_at = Column(DateTime(), nullable=False)
 
@@ -86,24 +93,28 @@ class Session(Base):
                    nullable=False)
 
     def __init__(self,
-                 sid: str,
+                 aid: str,
                  owner: str,
                  expires_at,
                  datetime=None):
         current_datetime = datetime or dt.utcnow()
 
-        self.sid = sid
+        self.aid = aid
         self.owner = owner
         self.issued_at = current_datetime
         self.expires_at = expires_at
 
     def __repr__(self):
-        return f'<Session {self.sid} owner={self.owner}>'
+        return f'<Session {self.aid} owner={self.owner}>'
 
 
 class RunTarget(enum.IntEnum):
     SIMULATE = 1
     SCREEN = 2
+
+    @staticmethod
+    def names():
+        return (t.name for t in RunTarget)
 
 
 class RunStatus(enum.IntEnum):
@@ -132,10 +143,6 @@ class Workspace(Base):
     run_target = Column(Enum(RunTarget), nullable=True)
     run_status = Column(Enum(RunStatus), nullable=False, server_default=RunStatus.IDLE.name)
 
-    owner = Column(String(8),
-                   ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
-                   nullable=True)
-
     def __init__(self,
                  wid: str,
                  env_path: str,
@@ -143,7 +150,6 @@ class Workspace(Base):
                  run_dir: str,
                  interpreter_path: str,
                  py_file: str,
-                 owner=None,
                  run_privilege=None,
                  max_runtime=None,
                  datetime=None):
@@ -156,7 +162,6 @@ class Workspace(Base):
         self.run_dir = run_dir
         self.interpreter_path = interpreter_path
         self.py_file = py_file
-        self.owner = owner
         self.run_privilege = run_privilege
         self.max_runtime = max_runtime
 
@@ -189,12 +194,9 @@ class RunLog(Base):
     run_path = Column(UnicodeText(), nullable=False)
     pid = Column(Integer(), nullable=False)
 
-    owner = Column(String(8),
-                   ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
-                   nullable=True)
-    workspace = Column(String(32),
-                       ForeignKey('workspaces.wid', onupdate="CASCADE", ondelete="SET NULL"),
-                       nullable=True)
+    uid = Column(String(8),
+                 ForeignKey('users.uid', onupdate="CASCADE", ondelete="SET NULL"),
+                 nullable=True)
 
     def __init__(self,
                  rid: str,
@@ -218,14 +220,14 @@ class RunLog(Base):
         return f'<RunLog {self.short_rid} pid={self.pid} run_path={self.py_file} user={self.user} workspace={self.workspace}>'
 
 
-def lookup_sid_cs(input_sid: str) -> Union[None, Session]:
+def lookup_aid_cs(input_aid: str) -> Union[None, AuthSession]:
     """
-    Case-sensitive session ID lookup.
-    :param input_sid: proposed session ID code
+    Case-sensitive auth ID lookup.
+    :param input_aid: proposed auth ID code
     :return: Session instance or None
     """
     with session.begin():
-        return Session.query.filter(Session.sid == func.binary(input_sid)).first()
+        return AuthSession.query.filter(AuthSession.aid == func.binary(input_aid)).first()
 
 
 def lookup_rid_cs(input_rid: str) -> Union[None, RunLog]:
@@ -248,12 +250,12 @@ def generate_run_log_token_safe():
     return result
 
 
-def generate_session_token_safe():
+def generate_auth_session_token_safe():
     result = generate_sanitized_alphanumerics(SESSION_TOKEN_LENGTH, special=True)
 
-    if lookup_sid_cs(result) is not None:
+    if lookup_aid_cs(result) is not None:
         LOG.info('one in a zillion just happened!')
-        return generate_session_token_safe()
+        return generate_auth_session_token_safe()
 
     return result
 

@@ -1,7 +1,7 @@
 import logging
 from flask import Blueprint, request
 from flask_restful import Api, Resource
-from common import LIMITER, CONFIG, SCREEN, THREADS
+from common import LIMITER, SCREEN, THREADS
 from database import session
 from .authentication import auth_endpoint_allowed, get_auth_status
 from utils import enum_name_or_null, isoformat_or_null
@@ -28,11 +28,12 @@ class ResetSystem(Resource):
 
                 try:
                     system.restart()
+                    return {}, 202
                 except:
-                    LOG.info('requesting system restart failed')
+                    LOG.warning('requesting system restart failed')
                     pass
 
-                return {}, 200
+                return {'message': 'request to restart failed'}, 500
         return {}, 403
 
 
@@ -105,7 +106,7 @@ class RunWorkspace(Resource):
                 'run_log': rid,
                 'simulating': workspace.run_privilege == RunTarget.SIMULATE
             }
-            return payload, 200
+            return payload, 202
         else:
             return {'message': 'failed to start workspace'}, 500
 
@@ -155,17 +156,6 @@ class CreateWorkspace(Resource):
 
             content = request.get_data(as_text=True)
 
-        owner_text = request.args.get('owner')
-        owner_uid = None
-
-        if owner_text is not None:
-            owner = User.query.get(owner_text)
-
-            if owner is None:
-                return {'message': 'UID not found'}, 400
-            else:
-                owner_uid = owner.uid
-
         run_privilege_text = request.args.get('run_privilege')
         run_privilege = None
 
@@ -185,7 +175,6 @@ class CreateWorkspace(Resource):
                 return {'message': 'cannot parse max_runtime'}, 400
 
         workspace = system.create_workspace(py_contents=content,
-                                            owner=owner_uid,
                                             run_privilege=run_privilege,
                                             max_runtime=max_runtime)
         return {'workspace': workspace.wid}, 200
