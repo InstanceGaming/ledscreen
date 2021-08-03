@@ -1,0 +1,13 @@
+flask
+flask-restful
+flask-minify
+flask-socketio
+pymysql
+pytoml
+dotted
+sqlalchemy
+openpyxl
+eventlet
+kombu
+pillow
+numpy

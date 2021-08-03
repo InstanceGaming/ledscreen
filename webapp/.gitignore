@@ -1,0 +1,11 @@
+**/__pycache__
+env/**
+environments/**
+storage/**
+run/**
+archived/**
+*.jpg
+*.png
+fonts/**
+playground.py
+config.toml

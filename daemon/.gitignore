@@ -1,8 +1,0 @@
-**/__pycache__
-env/**
-environments/**
-storage/**
-run/**
-archived/**
-playground.py
-config.toml

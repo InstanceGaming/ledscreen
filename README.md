@@ -1,6 +1,6 @@
-# ledscreen
+# ledscreen (simplified)
 
-This rather monolithic Python project is designed to control a 1944-pixel WS2813 LED screen in a classroom environment.
+Stripped-down version of `websocket` branch with only admin account and pluggram features.
 
 <b>This project is currently under active development.</b>
 
@@ -14,8 +14,6 @@ The main control system for the screen. It has a few responsabilities:
 
 - Serving web requests
 - Seemless IPC
-- Handling student Python code and environments
-- Presenting a web-based psudo-IDE to students
 - Database connections and setup
 - Plugin-like Python scripts ("built-in programs")
 - All-in-one-place management portal for teachers
