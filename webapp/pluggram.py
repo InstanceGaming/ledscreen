@@ -233,7 +233,7 @@ class PluggramMeta:
 class Pluggram(abc.ABC):
 
     @abc.abstractmethod
-    def render(self):
+    def tick(self):
         pass
 
 
@@ -280,10 +280,19 @@ def load(programs_dir: str, argument_count):
                                         'module does not define a class inheriting Pluggram')
                             continue
 
-                        # 3. ensure the class has a constructor
-                        if not hasattr(pluggram_module_class, '__init__'):
+                        # 3. ensure the class has a constructor and tick()
+                        init_func = getattr(pluggram_module_class, '__init__', None)
+
+                        if not callable(init_func):
                             LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                        'does not define a constructor')
+                                        'does not define constructor')
+                            continue
+
+                        tick_func = getattr(pluggram_module_class, 'tick', None)
+
+                        if not callable(tick_func):
+                            LOG.warning(f'disqualifying {module_name}.{class_name}: '
+                                        'does not define tick() method')
                             continue
 
                         # 4. note argument count

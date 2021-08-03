@@ -18,7 +18,7 @@ except ModuleNotFoundError:
 
     _LED_STRIP_CLASS = DummyStrip
 
-MAX_BRIGHTNESS = 196
+MAX_BRIGHTNESS = 190
 
 
 class Screen:
