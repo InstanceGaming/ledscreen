@@ -2,7 +2,6 @@ import os
 import logging
 import importlib.util
 import traceback as tb
-import abc
 import inspect
 import re
 from inspect import Parameter
@@ -10,7 +9,7 @@ from inspect import Parameter
 LOG = logging.getLogger('ledscreen.pluggram')
 
 
-INTERVAL_PATTERN = re.compile(r'(\d.+)(ms|s|m)')
+INTERVAL_PATTERN = re.compile(r'(\d+)(ms|s|m)')
 
 
 def parse_interval_text(raw_value):
@@ -119,7 +118,7 @@ class Option:
                     raise TypeError('max value must be an integer')
 
     def __repr__(self):
-        return f'<Option "{self._key}" {self.type} default={self._default}>'
+        return f'<Option "{self._key}" {self.type.__name__.upper()} default={self._default}>'
 
     def validate(self, o):
         if isinstance(o, str):
@@ -132,7 +131,7 @@ class Option:
             min_ok = False
 
             if self._min is not None:
-                if o > self._min:
+                if o >= self._min:
                     min_ok = True
             else:
                 min_ok = True
@@ -164,6 +163,10 @@ class PluggramMeta:
         return self._display_name
 
     @property
+    def class_name(self):
+        return self._class_name
+
+    @property
     def version(self):
         return self._version
 
@@ -189,6 +192,7 @@ class PluggramMeta:
                  entry_class: type,
                  tick_rate: int,
                  name: str,
+                 class_name: str,
                  display_name: str,
                  description: str,
                  version: str,
@@ -197,6 +201,7 @@ class PluggramMeta:
         self._module = module
         self._path = module_path
         self._entry_class = entry_class
+        self._class_name = class_name
         self._tick_rate = tick_rate
         self._name = name
         self._display_name = display_name
@@ -213,6 +218,7 @@ class PluggramMeta:
         known_keys = [o.key for o in self._options]
         for key, value in kwargs.items():
             if key in known_keys:
+                known_keys.remove(key)
                 for option in self._options:
                     if option.key == key:
                         valid = option.validate(value)
@@ -221,8 +227,16 @@ class PluggramMeta:
                             raise ValueError(f'Option "{key}" has invalid value')
 
                         break
+
+        for unset_key in known_keys:
+            for option in self._options:
+                if option.key == unset_key:
+                    default_value = option.default
+                    break
             else:
-                raise RuntimeError(f'Unknown option "{key}"')
+                raise RuntimeError(f'Failed to find default value for unset kwarg "{unset_key}"')
+
+            kwargs.update({unset_key: default_value})
 
         self._instance = self._entry_class(*args, **kwargs)
 
@@ -230,11 +244,10 @@ class PluggramMeta:
         self._instance.tick()
 
 
-class Pluggram(abc.ABC):
+class Pluggram:
 
-    @abc.abstractmethod
     def tick(self):
-        pass
+        raise NotImplementedError('tick() was never overridden')
 
 
 def load(programs_dir: str, argument_count):
@@ -264,31 +277,30 @@ def load(programs_dir: str, argument_count):
                             continue
 
                         # 1. get class definitions in module to find entrypoint
-                        pluggram_module_class = None
                         class_members = inspect.getmembers(loaded_module, inspect.isclass)
 
+                        module_class = None
                         # 2. find one class which inherits Pluggram or DQ
                         for class_name, module_class in class_members:
                             bases = module_class.__bases__
 
                             if Pluggram in bases:
-                                pluggram_module_class = module_class
                                 break
 
-                        if pluggram_module_class is None:
+                        if module_class is None:
                             LOG.warning(f'disqualifying module {module_name}: '
                                         'module does not define a class inheriting Pluggram')
                             continue
 
                         # 3. ensure the class has a constructor and tick()
-                        init_func = getattr(pluggram_module_class, '__init__', None)
+                        init_func = getattr(module_class, '__init__', None)
 
                         if not callable(init_func):
                             LOG.warning(f'disqualifying {module_name}.{class_name}: '
                                         'does not define constructor')
                             continue
 
-                        tick_func = getattr(pluggram_module_class, 'tick', None)
+                        tick_func = getattr(module_class, 'tick', None)
 
                         if not callable(tick_func):
                             LOG.warning(f'disqualifying {module_name}.{class_name}: '
@@ -296,36 +308,35 @@ def load(programs_dir: str, argument_count):
                             continue
 
                         # 4. note argument count
-                        construct_parameters = inspect.signature(pluggram_module_class.__init__).parameters
+                        construct_parameters = inspect.signature(module_class.__init__).parameters
                         positional_count = 0
 
                         for parameter in construct_parameters.values():
                             if parameter.name != 'self':
-                                if parameter.kind == Parameter.POSITIONAL_ONLY and parameter.default == Paremeter.empty:
+                                if parameter.kind == Parameter.POSITIONAL_ONLY and parameter.default == Parameter.empty:
                                     positional_count += 1
 
                         if positional_count > argument_count:
                             LOG.warning(f'disqualifying {module_name}.{class_name}: '
                                         f'constructor positional arguments mismatch ({positional_count} wanted, '
-                                        f'{argument_count} exist)')
+                                        f'{argument_count} given)')
                             continue
 
                         # 5. collect metadata
                         display_name = module_name
-                        if hasattr(pluggram_module_class, 'DISPLAY_NAME'):
-                            display_name = str(pluggram_module_class.DISPLAY_NAME)
+                        if hasattr(module_class, 'DISPLAY_NAME'):
+                            display_name = str(module_class.DISPLAY_NAME)
 
                         description = None
-                        if hasattr(pluggram_module_class, 'DESCRIPTION'):
-                            description = str(pluggram_module_class.DESCRIPTION)
+                        if hasattr(module_class, 'DESCRIPTION'):
+                            description = str(module_class.DESCRIPTION)
 
                         version_text = None
-                        if hasattr(pluggram_module_class, 'VERSION'):
-                            version_text = str(pluggram_module_class.VERSION)
+                        if hasattr(module_class, 'VERSION'):
+                            version_text = str(module_class.VERSION)
 
-                        tick_rate = None
-                        if hasattr(pluggram_module_class, 'TICK_RATE'):
-                            tick_rate = parse_interval_text(pluggram_module_class.TICK_RATE)
+                        if hasattr(module_class, 'TICK_RATE'):
+                            tick_rate = parse_interval_text(module_class.TICK_RATE)
 
                             if tick_rate is not None and tick_rate < 0:
                                 if tick_rate == -1:
@@ -347,9 +358,9 @@ def load(programs_dir: str, argument_count):
                             continue
 
                         option_definitions = []
-                        if hasattr(pluggram_module_class, 'OPTIONS'):
-                            if isinstance(pluggram_module_class.OPTIONS, list):
-                                option_definitions = pluggram_module_class.OPTIONS
+                        if hasattr(module_class, 'OPTIONS'):
+                            if isinstance(module_class.OPTIONS, list):
+                                option_definitions = module_class.OPTIONS
                             else:
                                 LOG.warning(f'disqualifying {module_name}.{class_name}: '
                                             f'"OPTIONS" property is not a list')
@@ -357,9 +368,10 @@ def load(programs_dir: str, argument_count):
 
                         pluggram_metas.append(PluggramMeta(loaded_module,
                                                            module_path,
-                                                           type(pluggram_module_class),
+                                                           module_class,
                                                            tick_rate,
                                                            module_name,
+                                                           class_name,
                                                            display_name,
                                                            description,
                                                            version_text,

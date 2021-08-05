@@ -10,6 +10,7 @@
       <excludeFolder url="file://$MODULE_DIR$/run" />
       <excludeFolder url="file://$MODULE_DIR$/environments" />
       <excludeFolder url="file://$MODULE_DIR$/fonts" />
+      <excludeFolder url="file://$MODULE_DIR$/frames" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (webapp)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

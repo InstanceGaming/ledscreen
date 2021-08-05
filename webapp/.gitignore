@@ -4,8 +4,8 @@ environments/**
 storage/**
 run/**
 archived/**
-*.jpg
-*.png
 fonts/**
-playground.py
 config.toml
+frames/*.png
+frames/*.jpg
+frames/*.jpeg

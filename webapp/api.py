@@ -22,6 +22,7 @@ MAX_BRIGHTNESS = 190
 
 
 class Screen:
+    COLOR_MODE = 'RGB'
 
     @property
     def width(self):
@@ -48,6 +49,17 @@ class Screen:
     def center(self):
         return int(round(self._w / 2)), int(round(self._h / 2))
 
+    @property
+    def antialiasing(self):
+        return self._painter.fontmode == 'L'
+
+    @antialiasing.setter
+    def antialiasing(self, v):
+        if v:
+            self._painter.fontmode = 'L'
+        else:
+            self._painter.fontmode = '1'
+
     def __init__(self,
                  w: int,
                  h: int,
@@ -57,7 +69,8 @@ class Screen:
                  brightness: int,
                  invert_signal: bool,
                  gpio_channel: int,
-                 fonts_dir: str):
+                 fonts_dir: str,
+                 antialiasing=False):
         super().__init__()
 
         self._logger = logging.getLogger()
@@ -67,8 +80,9 @@ class Screen:
         self._font_dir = os.path.abspath(fonts_dir)
         self._cached_fonts = {'default': ImageFont.load_default()}
         self._current_font = self._cached_fonts['default']
-        self._canvas = self._create_image('RGB', 0)
+        self._canvas = self._create_image(self.COLOR_MODE, 0)
         self._painter = ImageDraw.Draw(self._canvas)
+        self.antialiasing = antialiasing
         self._matrix = _LED_STRIP_CLASS(self.pixel_count,
                                         self._output_pin,
                                         frequency,
@@ -78,6 +92,11 @@ class Screen:
                                         gpio_channel)
         self.set_brightness(brightness)
         self._matrix.begin()
+
+    def _set_canvas(self, mode: str, color: int):
+        self._canvas = self._create_image(mode, color)
+        self._painter = ImageDraw.Draw(self._canvas)
+        self._painter.fontmode = '1'
 
     def _create_image(self, mode: str, color_data):
         return Image.new(mode, (self._w, self._h), color_data)
@@ -104,6 +123,15 @@ class Screen:
 
     def set_font(self, name: str, size=None, font_face=None) -> bool:
         name = name.lower().strip()
+        unique_name = name
+
+        if size is not None:
+            assert isinstance(size, int)
+            unique_name += f'@{size}'
+
+        if font_face is not None:
+            assert isinstance(font_face, int)
+            unique_name += f'#{font_face}'
 
         if name == 'default':
             self._current_font = self._cached_fonts['default']
@@ -113,7 +141,7 @@ class Screen:
             raise ValueError('Font size is required for all non-default fonts')
 
         if name in self._cached_fonts.keys():
-            self._current_font = self._cached_fonts[name]
+            self._current_font = self._cached_fonts[unique_name]
             return True
         else:
             try:
@@ -127,7 +155,7 @@ class Screen:
                     self._current_font = ImageFont.load(font_path)
                     LOG.info(f'loaded font "{name}"')
 
-                self._cached_fonts.update({name: self._current_font})
+                self._cached_fonts.update({unique_name: self._current_font})
                 return True
             except OSError:
                 LOG.debug(f'failed to load font "{name}" from "{self._font_dir}"')
@@ -166,8 +194,7 @@ class Screen:
         Draw text into the current frame to be rendered.
         See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html#text-anchors for more details on anchoring.
 
-        :param x: x coordinate
-        :param y: y coordinate up to screen height
+        :param xy: x, y screen coordinates
         :param color: foreground color (what the text will be filled with)
         :param message: characters to draw from the current font
         :param anchor: anchoring position (graph origin) of the text, "lt" or "la" (default)
@@ -177,7 +204,9 @@ class Screen:
         :param stroke_fill: color of outline around each character
         """
         assert isinstance(xy, tuple)
-        self._painter.text(xy,
+        a = xy[0]
+        b = xy[1]
+        self._painter.text((a, b),
                            message,
                            fill=color,
                            font=self._current_font,
@@ -188,7 +217,7 @@ class Screen:
                            stroke_fill=stroke_fill)
 
     def fill(self, color: int):
-        self._canvas = self._create_image('RGB', color)
+        self._set_canvas(self.COLOR_MODE, color)
         self.render()
 
     def clear(self):
@@ -196,3 +225,6 @@ class Screen:
 
     def write_file(self, filename: str):
         self._canvas.save(filename)
+
+    def get_data(self):
+        self._canvas.getdata()
