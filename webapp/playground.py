@@ -25,26 +25,27 @@ pgm = load('programs', 1)
 print(f'loaded {len(pgm)} pluggrams')
 
 if len(pgm) > 0:
-    active_pluggram = pgm[0]
+    selected_pluggram_meta = pgm[0]
 
     try:
-        active_pluggram.init(screen, foreground=0x00FF00)
+        pluggram_instance = selected_pluggram_meta.init(screen)
     except Exception as e:
-        print(f'exception {e.__class__.__name__} initializing pluggram "{active_pluggram.name}" ({active_pluggram.class_name}): {str(e)}')
+        print(f'exception {e.__class__.__name__} initializing pluggram "{selected_pluggram_meta.name}" ({selected_pluggram_meta.class_name}): {str(e)}')
         print(traceback.format_exc())
         exit(100)
 
     output_dir = 'frames'
     frame_count = 1
     marker = timing_counter()
+    rate = selected_pluggram_meta.tick_rate
     try:
         while True:
-            if timing_counter() - marker > active_pluggram.tick_rate:
+            if (rate is not None and timing_counter() - marker > rate) or rate is None:
                 marker = timing_counter()
                 try:
-                    active_pluggram.tick()
+                    pluggram_instance.tick()
                 except Exception as e:
-                    print(f'exception {e.__class__.__name__} updating pluggram "{active_pluggram.name}": {str(e)}')
+                    print(f'exception {e.__class__.__name__} updating pluggram "{selected_pluggram_meta.name}": {str(e)}')
                     print(traceback.format_exc())
                     exit(101)
                 filename = f'{frame_count}.png'
@@ -53,7 +54,7 @@ if len(pgm) > 0:
                 print(f'frame #{frame_count}')
                 frame_count += 1
 
-                if frame_count > 420:
+                if frame_count == 1024:
                     break
     except KeyboardInterrupt:
         print('interrupted')

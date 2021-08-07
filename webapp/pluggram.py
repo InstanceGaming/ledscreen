@@ -209,7 +209,6 @@ class PluggramMeta:
         self._version = version
         self._positional_count = positional_count
         self._options = options or []
-        self._instance = None
 
     def init(self, *args, **kwargs):
         if len(args) < self._positional_count:
@@ -238,10 +237,7 @@ class PluggramMeta:
 
             kwargs.update({unset_key: default_value})
 
-        self._instance = self._entry_class(*args, **kwargs)
-
-    def tick(self):
-        self._instance.tick()
+        return self._entry_class(*args, **kwargs)
 
 
 class Pluggram:

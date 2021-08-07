@@ -217,8 +217,7 @@ class Screen:
                            stroke_fill=stroke_fill)
 
     def fill(self, color: int):
-        self._set_canvas(self.COLOR_MODE, color)
-        self.render()
+        self._painter.rectangle((0, 0, self._w, self._h), fill=color)
 
     def clear(self):
         self.fill(0)
