@@ -182,10 +182,6 @@ class PluggramMeta:
     def tick_rate(self):
         return self._tick_rate
 
-    @property
-    def running(self):
-        return self._instance is not None
-
     def __init__(self,
                  module,
                  module_path: str,

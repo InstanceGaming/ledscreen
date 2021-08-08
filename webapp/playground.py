@@ -26,6 +26,7 @@ print(f'loaded {len(pgm)} pluggrams')
 
 if len(pgm) > 0:
     selected_pluggram_meta = pgm[0]
+    print(f'selected "{selected_pluggram_meta.name}"')
 
     try:
         pluggram_instance = selected_pluggram_meta.init(screen)
@@ -36,8 +37,8 @@ if len(pgm) > 0:
 
     output_dir = 'frames'
     frame_count = 1
-    marker = timing_counter()
     rate = selected_pluggram_meta.tick_rate
+    marker = -rate
     try:
         while True:
             if (rate is not None and timing_counter() - marker > rate) or rate is None:
@@ -54,7 +55,7 @@ if len(pgm) > 0:
                 print(f'frame #{frame_count}')
                 frame_count += 1
 
-                if frame_count == 1024:
+                if frame_count == 32:
                     break
     except KeyboardInterrupt:
         print('interrupted')

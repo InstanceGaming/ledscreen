@@ -80,7 +80,7 @@ class Screen:
         self._font_dir = os.path.abspath(fonts_dir)
         self._cached_fonts = {'default': ImageFont.load_default()}
         self._current_font = self._cached_fonts['default']
-        self._canvas = self._create_image(self.COLOR_MODE, 0)
+        self._canvas = self._create_canvas(self.COLOR_MODE, 0)
         self._painter = ImageDraw.Draw(self._canvas)
         self.antialiasing = antialiasing
         self._matrix = _LED_STRIP_CLASS(self.pixel_count,
@@ -94,11 +94,11 @@ class Screen:
         self._matrix.begin()
 
     def _set_canvas(self, mode: str, color: int):
-        self._canvas = self._create_image(mode, color)
+        self._canvas = self._create_canvas(mode, color)
         self._painter = ImageDraw.Draw(self._canvas)
         self._painter.fontmode = '1'
 
-    def _create_image(self, mode: str, color_data):
+    def _create_canvas(self, mode: str, color_data):
         return Image.new(mode, (self._w, self._h), color_data)
 
     def render(self):
@@ -132,10 +132,6 @@ class Screen:
         if font_face is not None:
             assert isinstance(font_face, int)
             unique_name += f'#{font_face}'
-
-        if name == 'default':
-            self._current_font = self._cached_fonts['default']
-            return True
 
         if size is None:
             raise ValueError('Font size is required for all non-default fonts')
@@ -211,13 +207,35 @@ class Screen:
                            fill=color,
                            font=self._current_font,
                            anchor=anchor,
-                           spacing=spacing,
+                           spacing=spacing or 0,
                            align=alignment,
                            stroke_width=stroke_width or 0,
                            stroke_fill=stroke_fill)
 
-    def fill(self, color: int):
-        self._painter.rectangle((0, 0, self._w, self._h), fill=color)
+    def fill(self, color: int, box=None):
+        """
+        Paint all or a portion of the screen with a color.
+
+        :param color: RGB color to fill with.
+        :param box: space to fill (leave None for the whole screen) of structure (x1, y1, x2, y2)
+        """
+        if box is not None:
+            if not isinstance(box, tuple):
+                raise TypeError('box must be a tuple of structure (x1, y1, x2, y2)')
+
+            if len(box) != 4:
+                raise TypeError('box must be a tuple of structure (x1, y1, x2, y2)')
+
+        self._painter.rectangle(box or (0, 0, self._w, self._h), fill=color)
+
+    def draw_elipse(self, xy, width=None, color=None, outline=None):
+        self._painter.ellipse(xy, fill=color, outline=outline, width=width)
+
+    def draw_line(self, xy, color=None, width=None, rounded=False):
+        self._painter.line(xy, fill=color, width=width, joint='curve' if rounded else None)
+
+    def draw_bitmap(self, xy, bitmap, color=None):
+        self._painter.bitmap(xy, bitmap, fill=color)
 
     def clear(self):
         self.fill(0)
