@@ -1,46 +1,65 @@
-import logging
+import hmac
 import logging
 import os
 import re
 import subprocess
+import utils
+from flask import request
+from datetime import datetime, timedelta
+from typing import Optional, List
 
-import database
-from database import session
-from models import (User,
-                    UserType,
-                    AuthSession,
-                    generate_user_token_safe, )
+from api import Screen
 from pluggram import PluggramMeta
 
 VERSION = '1.0.0'
 LOG = logging.getLogger('ledscreen.system')
-
-
-def start_pluggram(pluggram: PluggramMeta) -> bool:
-    pass
-
-
-def pause_pluggram(pluggram: PluggramMeta, clear_screen=False):
-    pass
-
-
-def stop_pluggram(pluggram: PluggramMeta):
-    pause_pluggram(pluggram, clear_screen=True)
-
-
 USERNAME_PATTERN = re.compile('[^A-Za-z- ]+')
+AUTH_COOKIE_NAME = 'ledscreen'
+SESSION_TOKEN_LENGTH = 32
+
+config = {}
+loaded_pluggrams = []
+screen: Optional[Screen] = None
 
 
-def validate_username(value):
-    if value is not None:
-        if isinstance(value, str):
-            if 1 < len(value) < 40:
-                if not USERNAME_PATTERN.search(value):
-                    return True
-    return False
+class UserState:
+    def __init__(self):
+        self.session_token: Optional[str] = None
+        self.expiration: Optional[datetime] = None
+        self.last_activity: Optional[datetime] = None
+
+    @property
+    def expired(self):
+        if self.last_activity is not None and self.expiration is not None:
+            if self.last_activity > self.expiration:
+                return True
+        return False
+
+    def login(self):
+        self.session_token = utils.generate_sanitized_alphanumerics(SESSION_TOKEN_LENGTH)
+        self.expiration = datetime.utcnow() + timedelta(minutes=config.get('app.max_session_minutes'))
+        self.ping()
+        LOG.info(f'authenticated user with session {user_state.session_token}')
+
+    def ping(self):
+        self.last_activity = datetime.utcnow()
+
+    def logout(self):
+        self.session_token = None
+        LOG.info(f'unauthenticated user from session {user_state.session_token}')
+
+    def validate_session(self, b: str):
+        if self.session_token and b:
+            if self.session_token == b:
+                return True
+
+        return False
 
 
-def validate_password(value):
+user_state = UserState()
+
+
+def validate_password(value) -> bool:
     if value is not None:
         if isinstance(value, str):
             if 6 <= len(value) < 64:
@@ -48,49 +67,37 @@ def validate_password(value):
     return False
 
 
-def create_user(user_type: UserType,
-                user_name: str,
-                expiry=None,
-                password=None,
-                lock=False,
-                comment=None):
-    uid = generate_user_token_safe()
-    short_text = uid[:16]
-
-    LOG.debug(f'creating user {short_text}')
-
-    with session.begin():
-        if user_type != UserType.STUDENT:
-            lock = False
-
-        user = User(uid,
-                    user_type,
-                    user_name.capitalize(),
-                    expiry=expiry,
-                    password=password,
-                    comment=comment,
-                    lock=lock)
-        session.add(user)
-
-    LOG.info(f'created user {short_text}')
-    return user
+def check_password(stored, given) -> bool:
+    return hmac.compare_digest(stored, given)
 
 
-def remove_user(uid: str):
-    short_text = uid[:16]
-    LOG.debug(f'removing user {short_text}')
-    user = User.query.get(uid)
+def authenticate_user(password: str):
+    if password is not None:
+        config_password = config['user.password']
+        if check_password(config_password, password):
+            user_state.login()
+            return True
+    return False
 
-    if user is not None:
-        with session.begin():
-            session.delete(user)
-        LOG.info(f'removed user {short_text}')
-        return True
+
+def is_user_authenticated() -> bool:
+    cookie_value = request.cookies.get(AUTH_COOKIE_NAME)
+    LOG.debug(
+        f'is_user_authenticated(): expired={user_state.expired} cookie_value={cookie_value} stored={user_state.session_token}')
+    if not user_state.expired:
+        if user_state.validate_session(cookie_value):
+            return True
     return False
 
 
 def shutdown():
-    # todo: show message on screen
+    screen.clear()
+    screen.set_font('default')
+    screen.draw_text((0, 0),
+                     0x0000FF,
+                     'Poweroff',
+                     anchor='lt',
+                     alignment='left')
 
     if os.name == 'posix':
         args = ['poweroff']
@@ -104,7 +111,13 @@ def shutdown():
 
 
 def restart():
-    # todo: show message on screen
+    screen.clear()
+    screen.set_font('default')
+    screen.draw_text((0, 0),
+                     0x00FFFF,
+                     'Restart',
+                     anchor='lt',
+                     alignment='left')
 
     if os.name == 'posix':
         LOG.info(f'restarting...')
@@ -114,15 +127,18 @@ def restart():
         raise NotImplementedError('Intentionally left unimplemented; this system is only used on Linux')
 
 
-def reset():
-    LOG.info(f'--- BEGINNING RESET ---')
-
-    # 3. Purge all auth sessions
-    if database.has_table(AuthSession.__tablename__):
-        database.truncate_table(session, AuthSession.__tablename__)
-
-    # 4. Remove all users
-    if database.has_table(User.__tablename__):
-        database.truncate_table(session, User.__tablename__, ignore_constraints=True)
-
-    LOG.info(f'--- RESET COMPLETED ---')
+def init(conf, pluggrams: List[PluggramMeta]):
+    global config, loaded_pluggrams, screen
+    config = conf
+    loaded_pluggrams = pluggrams
+    screen = Screen(
+        config['screen.width'],
+        config['screen.height'],
+        config['screen.gpio_pin'],
+        config['screen.frequency'],
+        config['screen.dma_channel'],
+        config['screen.brightness'],
+        config['screen.inverted'],
+        config['screen.gpio_channel'],
+        config['screen.fonts_dir']
+    )

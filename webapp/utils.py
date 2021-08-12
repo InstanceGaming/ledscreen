@@ -1,4 +1,3 @@
-import datetime
 import subprocess
 import threading
 import time
@@ -6,9 +5,9 @@ import random
 import os
 import pytoml
 import logging
-from urllib.parse import urlparse
-from dotted.collection import DottedDict
-from typing import Tuple, Union, NoReturn, Callable, Iterable
+from dotted.collection import DottedDict, DottedList
+from typing import Callable
+
 
 LOG = logging.getLogger('ledscreen.utils')
 MAX_COLORS = 16777215
@@ -31,13 +30,6 @@ def configure_logger(log, prod_level=logging.INFO):
 
     log.handlers.clear()
     log.addHandler(handler)
-
-
-def get_url_port(url_text: str) -> Union[None, int]:
-    try:
-        return urlparse(url_text).port
-    except ValueError:
-        return None
 
 
 def get_config_path():
@@ -83,27 +75,18 @@ def load_config():
     _config_node_or_exit(config, 'app.secret')
     _config_node_or_exit(config, 'app.programs_dir')
     _config_node_or_exit(config, 'app.minification')
+    _config_node_or_exit(config, 'app.api_keys')
 
-    _config_node_or_exit(config, 'default_admin')
-    _config_node_or_exit(config, 'default_admin.username')
-    _config_node_or_exit(config, 'default_admin.password')
-
-    _config_node_or_exit(config, 'sandbox')
-    _config_node_or_exit(config, 'sandbox.run_dir')
-    _config_node_or_exit(config, 'sandbox.storage_dir')
-    _config_node_or_exit(config, 'sandbox.envs_dir')
-    _config_node_or_exit(config, 'sandbox.user_id')
-    _config_node_or_exit(config, 'sandbox.group_id')
-    _config_node_or_exit(config, 'sandbox.entrypoint')
-    _config_node_or_exit(config, 'sandbox.api_dist')
-    _config_node_or_exit(config, 'sandbox.default_modules')
-
-    if not isinstance(config['sandbox.default_modules'], Iterable):
-        LOG.error(f'{config_path}: "sandbox.default_modules" must be iterable')
+    if not isinstance(config['app.api_keys'], DottedList):
+        LOG.error(f'{config_path}: "app.api_keys" must be a list')
         exit(3)
 
-    _config_node_or_exit(config, 'database')
-    _config_node_or_exit(config, 'database.uri')
+    _config_node_or_exit(config, 'app.max_session_minutes')
+
+    _config_node_or_exit(config, 'user')
+    _config_node_or_exit(config, 'user.name')
+    _config_node_or_exit(config, 'user.password')
+
     _config_node_or_exit(config, 'screen')
     _config_node_or_exit(config, 'screen.width')
     _config_node_or_exit(config, 'screen.height')
@@ -117,13 +100,6 @@ def load_config():
 
     if not os.path.isdir(config['screen.fonts_dir']):
         LOG.error(f'{config_path}: "screen.fonts_dir" must be a valid directory')
-        exit(3)
-
-    _config_node_or_exit(config, 'ipc')
-    _config_node_or_exit(config, 'ipc.rx')
-
-    if get_url_port(config['ipc.rx']) is None:
-        LOG.error(f'{config_path}: "ipc.rx" must define a port number')
         exit(3)
 
     return config
@@ -155,11 +131,11 @@ def pretty_timedelta(td, prefix=None, format_spec=None):
     if td is not None:
         seconds = td.total_seconds()
         if seconds < 60:
-            return prefix + format(seconds, format_spec) + ' seconds'
+            return prefix + format(seconds, format_spec) + ' sec'
         elif 60 <= seconds < 3600:
-            return prefix + format(seconds / 60, format_spec) + ' minutes'
+            return prefix + format(seconds / 60, format_spec) + ' min'
         elif 3600 <= seconds < 86400:
-            return prefix + format(seconds / 3600, format_spec) + ' hours'
+            return prefix + format(seconds / 3600, format_spec) + ' hr'
         elif 86400 <= seconds:
             return prefix + format(seconds / 86400, format_spec) + ' days'
     return None
@@ -200,24 +176,6 @@ def generate_sanitized_alphanumerics(length: int, lowercase=True, special=False)
         result += random.choice(char_set)
 
     return result
-
-
-def generate_url_binary(length: int):
-    return random.randbytes(int(round(length/2))).hex()
-
-
-def check_font_size(size: int, bold=False) -> NoReturn:
-    """
-    Check if the current font size is possible.
-    :param size: Desired font size.
-    :param bold: If the font should be considered in bold.
-    :raises ValueError: If the font cannot be displayed at this size.
-    """
-    if size is None:
-        raise ValueError('font size cannot be none')
-
-    if size not in range(0, 1000):
-        raise ValueError('font size must be within range 0-1000, was {}'.format(size))
 
 
 def combine_rgb(r: int, g: int, b: int):

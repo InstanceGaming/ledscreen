@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!--suppress ALL -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -8,7 +9,6 @@
     <script src="/static/js/jquery.min.js"></script>
     <script src="/static/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/socket.io.min.js"></script>
-    <script src="/static/js/manage.js" defer></script>
     <style>
         body {
             background-color: #eee;
@@ -54,36 +54,111 @@
             color: #555;
             font-size: 1.2rem;
         }
+        #screen-preview {
+            width: 300px;
+            height: 200px;
+        }
     </style>
 </head>
 <body>
-<!-- Reset confirmation -->
-<div class="modal fade" id="reset-modal" tabindex="-1" aria-labelledby="reset-confirm-label" aria-hidden="true">
+{% for program in programs %}
+<div class="modal" tabindex="-1" id="settings-modal-{{ program.name }}">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="reset-confirm-label">Confirm Reset</h5>
+                <h5 class="modal-title">Settings for {{ program.display_name }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body text-center">
-                <h4>Are you absolutely sure?</h4>
-                <h6><b>This action CANNOT BE UNDONE.</b></h6>
-                <hr/>
-                <p>
-                    When pressed, all system webpages will temporarily stop working.
-                    This process will take 3 minutes or less and then the system will restart.
-                </p>
-                <p>
-                    When going through first-time setup again, you will be prompted for the password for this account.
-                </p>
+            <div class="modal-body">
+                <form action="#">
+                    {% for opt in program.options %}
+                        {% if opt.type_name == 'INT' %}
+                        <div class="row mb-3">
+                            <label for="setting-input-{{ opt.markup_id }}"
+                                   class="col-sm-5 col-form-label"
+                                   title="{{ opt.help_text or opt.display_name}}">
+                                {{ opt.display_name }}
+                            </label>
+                            <div class="col-sm-7">
+                            {% if opt.input_method == 1 %}
+                                <input type="color" class="form-control form-control-color"
+                                       id="setting-input-{{ opt.markup_id }}"
+                                       value="{{ opt.default }}"
+                                       title="Pick a color">
+                            {% else %}
+                                <input type="number"
+                                       class="form-control"
+                                       value="{{ opt.default }}"
+                                       {% if opt.min %}
+                                       min="{{ opt.min }}"
+                                       {% endif %}
+                                       {% if opt.max %}
+                                       max="{{ opt.max }}"
+                                       {% endif %}
+                                       id="setting-input-{{ opt.markup_id }}"/>
+                            {% endif %}
+                            </div>
+                        </div>
+                        {% elif opt.type_name == 'BOOL' %}
+                        <div class="row mb-3">
+                            <div class="col-sm-7 offset-sm-5">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           checked="{{ 'on' if opt.default else 'off' }}"
+                                           id="setting-input-{{ opt.markup_id }}"/>
+                                    <label class="form-check-label"
+                                           for="setting-input-{{ opt.markup_id }}"
+                                           title="{{ opt.help_text or opt.display_name}}">
+                                        {{ opt.display_name }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        {% elif opt.type_name == 'str' and opt.choices|length > 1 %}
+                        <div class="row mb-3">
+                            <label for="setting-input-{{ opt.markup_id }}"
+                                   class="col-sm-5 col-form-label"
+                                   title="{{ opt.help_text or opt.display_name}}">
+                                {{ opt.display_name }}
+                            </label>
+                            <div class="col-sm-7">
+                                <select class="form-select" aria-label="Possible values of {{ opt.display_name }}">
+                                    {% for choice in opt.choices %}
+                                        {% if choice == opt.default %}
+                                            <option selected>{{ opt.default }}</option>
+                                        {% else %}
+                                            <option value="{{choice}}">{{ choice }}</option>
+                                        {% endif%}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="row mb-3">
+                            <label for="setting-input-{{ opt.markup_id }}"
+                                   class="col-sm-5 col-form-label"
+                                   title="{{ opt.help_text or opt.display_name}}">
+                                {{ opt.display_name }}
+                            </label>
+                            <div class="col-sm-7">
+                                <input type="text"
+                                       class="form-control"
+                                       value="{{ opt.default }}"
+                                       id="setting-input-{{ opt.markup_id }}"/>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </form>
             </div>
-            <div class="p-4 text-center">
-                <a type="button" class="btn btn-danger" style="margin-right: 5rem;" href="/api/system/reset">Begin reset</a>
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cancel</button>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Save changes</button>
             </div>
         </div>
     </div>
 </div>
+{% endfor %}
 <main>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
@@ -101,9 +176,6 @@
                             System
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="defaultDropdown">
-                            <li><a class="dropdown-item link-danger" href="#" data-bs-toggle="modal"
-                                   data-bs-target="#reset-modal">Reset</a></li>
-                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="#">Restart</a></li>
                             <li><a class="dropdown-item" href="#">Power Off</a></li>
                         </ul>
@@ -117,15 +189,15 @@
     </nav>
     <div class="container-fluid">
         <div class="row justify-content-center">
-            <div class="col-lg-3"></div>
-            <div class="col-lg-6">
+            <div class="col-lg-4"></div>
+            <div class="col-lg-4">
                 <div class="my-3">
                     <div class="card card-panel">
                         <div class="card-panel card-header">
-                            My Dashboard
+                            Screen Preview
                         </div>
-                        <div class="card-body p-0">
-                            <div class="row justify-content-center" id="stats-container"></div>
+                        <div class="card-body p-0 text-center">
+                            <img id="screen-preview" src="/static/images/preview-placeholder.png" alt="Screen preview image">
                         </div>
                     </div>
                     {% if programs|length > 0 %}
@@ -153,19 +225,20 @@
                                         <td>
                                             <div class="btn-group float-end" role="group"
                                                  aria-label="Program row actions">
+                                                {% if program.options|length > 0 %}
                                                 <button type="button" class="btn btn-outline-secondary"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#settings-modal-{{ program.name }}"
                                                         title="Program settings">
                                                     <i class="bi-gear" role="img"
                                                        aria-label="Program settings"></i>
                                                 </button>
-                                                <button type="button" class="btn btn-primary"
-                                                        title="Set as start-up program">
-                                                    <i class="bi-bookmark-check" role="img"
-                                                       aria-label="Set as start-up program"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-success" title="Start">
+                                                {% endif %}
+                                                <button type="button" class="btn btn-success"
+                                                        id="btn-start-{{ program.name }}"
+                                                        title="Start">
                                                     <i class="bi-play-fill" role="img"
-                                                       aria-label="Start"></i>
+                                                       aria-label="Start program"></i>
                                                 </button>
                                             </div>
                                         </td>
@@ -174,92 +247,15 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning" role="alert">
+                        No built-in programs loaded. Please contact Jacob.
                     </div>
                     {% endif %}
-                    <div class="card card-panel">
-                        <div class="card-panel card-header">
-                            Students ({{ students|length }})
-                        </div>
-                        <div class="card-panel card-body">
-                            {% if students|length > 0 %}
-                            <div class="my-2">
-                                <button type="button" class="btn btn-outline-primary" title="Upload CSV"
-                                        id="import-csv-btn">
-                                    <i class="bi-upload" role="img"
-                                       aria-label="Upload CSV"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-primary" title="Download CSV"
-                                        id="export-csv-btn">
-                                    <i class="bi-download" role="img"
-                                       aria-label="Download CSV"></i>
-                                </button>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle">
-                                    <tr>
-                                        <th scope="col" style="width: 12%;">Code</th>
-                                        <th scope="col">Name</th>
-                                        <th scope="col">Status</th>
-                                        <th scope="col">Comment</th>
-                                        <th scope="col" class="text-end">Actions</th>
-                                    </tr>
-                                    {% for student in students %}
-                                    <tr>
-                                        <th scope="row" style="width: 12%;"><span class="user-code">{{ student.uid }}</span></th>
-                                        <td>{{ student.user_name }}</td>
-                                        <td>
-                                            {% if student.locked %}
-                                            <span class="bi-lock-fill" role="img"
-                                                  title="Locked"></span>
-                                            <br/>
-                                            {% else %}
-                                            <span class="bi-unlock-fill" role="img"
-                                                  title="Unlocked"></span>
-                                            <br/>
-                                            {% endif %}
-                                            <small>Online for 23min</small>
-                                        </td>
-                                        <td>{{ student.admin_comment }}</td>
-                                        <td>
-                                            <div class="btn-group float-end" role="group"
-                                                 aria-label="Student row actions">
-                                                <button type="button" class="btn btn-outline-secondary"
-                                                        title="User settings">
-                                                    <i class="bi-pencil" role="img"
-                                                       aria-label="User settings"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-primary" title="Workspace">
-                                                    <i class="bi-cpu" role="img"
-                                                       aria-label="Workspace"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-warning" title="Lock">
-                                                    <i class="bi-lock-fill" role="img"
-                                                       aria-label="Lock"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-danger" title="Stop" disabled>
-                                                    <i class="bi-stop-circle" role="img"
-                                                       aria-label="Stop"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </table>
-                            </div>
-                            {% else %}
-                            <div class="text-center my-2">
-                                <p><i>Nothing to list here, yet.</i></p>
-                                <button type="button" class="btn btn-success" id="add-student-btn">
-                                    <span class="bi-person-plus-fill btn-icon-combo" role="img"></span>
-                                    Import Roster
-                                </button>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
                 </div>
             </div>
-            <div class="col-lg-3"></div>
+            <div class="col-lg-4"></div>
         </div>
     </div>
 </main>

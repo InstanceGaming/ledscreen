@@ -1,20 +1,19 @@
-from datetime import datetime as dt
-
-from api import Screen
+from api import Screen, MAX_BRIGHTNESS
 from pluggram import Pluggram, Option
 from utils import timing_counter
 
 
-class WallClock(Pluggram):
-    DISPLAY_NAME = 'Wall Clock'
-    DESCRIPTION = 'Live digital clock display'
+class ScrollingText(Pluggram):
+    DISPLAY_NAME = 'Scrolling Text'
+    DESCRIPTION = 'Live text scroller'
     VERSION = '1.0.0'
     TICK_RATE = '10ms'
     OPTIONS = [
+        Option('brightness', 128, min=1, max=MAX_BRIGHTNESS),
         Option('line_count', 1, min=1, max=2),
         Option('start_delay', 1000),
-        Option('foreground', 0x0000FF, min=0, max=0xFFFFFF),
-        Option('background', 0, min=0, max=0xFFFFFF)
+        Option('foreground', 0x0000FF, min=0, max=0xFFFFFF, color_picker=True),
+        Option('background', 0, min=0, max=0xFFFFFF, color_picker=True)
     ]
     FONT = 'slkscrb.ttf'
     HALF_FONT = 10
@@ -23,6 +22,7 @@ class WallClock(Pluggram):
     def __init__(self,
                  screen: Screen,
                  **options):
+        self._brightness = options['brightness']
         self._line_count = options['line_count']
         self._fg = options['foreground']
         self._bg = options['background']
@@ -36,6 +36,7 @@ class WallClock(Pluggram):
         self._x = 0
 
         self._screen.clear()
+        self._screen.set_brightness(self._brightness)
         self._screen.set_font(self.FONT, 10)
 
         self.draw_line_message()

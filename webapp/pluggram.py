@@ -1,15 +1,24 @@
+import enum
 import os
 import logging
 import importlib.util
+import traceback
 import traceback as tb
 import inspect
 import re
+import threading
+from multiprocessing import Event
 from inspect import Parameter
+from utils import timing_counter
 
 LOG = logging.getLogger('ledscreen.pluggram')
-
-
 INTERVAL_PATTERN = re.compile(r'(\d+)(ms|s|m)')
+NAME_KEY_PATTERN = re.compile(r'(^a-z0-9_)')
+
+RUNNING_PLUGGRAM = None
+RUNNING_PLUGGRAM_META = None
+RUNNING_PLUGGRAM_THREAD = None
+_EXIT_EVENT = Event()
 
 
 def parse_interval_text(raw_value):
@@ -51,6 +60,11 @@ def parse_interval_text(raw_value):
     return -1
 
 
+class InputMethod(enum.IntEnum):
+    DEFAULT = 0
+    COLOR_PICKER = 1
+
+
 class Option:
     SUPPORTED_TYPES = [int, str, bool]
 
@@ -59,8 +73,20 @@ class Option:
         return self._key
 
     @property
+    def display_name(self):
+        return self.key.replace('_', ' ').capitalize()
+
+    @property
+    def markup_id(self):
+        return self.key.replace('_', '-').lower()
+
+    @property
     def type(self):
         return type(self._default)
+
+    @property
+    def type_name(self):
+        return self.type.__name__.upper()
 
     @property
     def default(self):
@@ -75,15 +101,40 @@ class Option:
         return self._max
 
     @property
+    def help_text(self):
+        return self._help_text
+
+    @property
     def choices(self):
         return self._choices
+    
+    @property
+    def input_method(self):
+        return self._input_method
+    
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, v):
+        if not self.validate(v):
+            raise ValueError('not valid')
+        self._value = v
 
     def __init__(self, key: str, default, **kwargs):
         self._key = key
+
+        if NAME_KEY_PATTERN.match(key):
+            raise ValueError(f'"{key}" is invalid (matched with pattern "{NAME_KEY_PATTERN.pattern}")')
+
         self._default = default
         self._min = None
         self._max = None
         self._choices = None
+        self._help_text = kwargs.get('help')
+        self._input_method = InputMethod.DEFAULT
+        self._value = None
 
         if self.type not in self.SUPPORTED_TYPES:
             raise TypeError(f'unsupported option type {self.type}')
@@ -93,6 +144,9 @@ class Option:
 
             if choices is not None:
                 if isinstance(choices, list):
+                    if default not in choices:
+                        raise ValueError('default value not present in choices')
+
                     self._choices = choices
                 else:
                     raise TypeError('choices must be of type list')
@@ -117,8 +171,11 @@ class Option:
                 else:
                     raise TypeError('max value must be an integer')
 
+            if kwargs.get('color_picker'):
+                self._input_method = InputMethod.COLOR_PICKER
+
     def __repr__(self):
-        return f'<Option "{self._key}" {self.type.__name__.upper()} default={self._default}>'
+        return f'<Option "{self._key}" {self.type_name} default={self._default}>'
 
     def validate(self, o):
         if isinstance(o, str):
@@ -373,3 +430,53 @@ def load(programs_dir: str, argument_count):
                         LOG.info(f'loaded pluggram {class_name} ("{module_path}")')
 
     return pluggram_metas
+
+
+def _pluggram_worker(meta: PluggramMeta, instance: Pluggram):
+    rate = meta.tick_rate
+    marker = -rate
+    while True:
+        if (rate is not None and timing_counter() - marker > rate) or rate is None:
+            marker = timing_counter()
+            try:
+                instance.tick()
+            except Exception as e:
+                LOG.error(f'exception while updating pluggram "{meta.name}": {str(e)}')
+                LOG.error(traceback.format_exc())
+        if _EXIT_EVENT.is_set():
+            break
+
+
+def _start_thread(pluggram: PluggramMeta):
+    t = threading.Thread(target=_pluggram_worker, args=[pluggram])
+    t.start()
+    return t
+
+
+def _stop_thread(thread: threading.Thread):
+    _EXIT_EVENT.set()
+    thread.join()
+
+
+def start_pluggram(meta: PluggramMeta, *args):
+    global RUNNING_PLUGGRAM, RUNNING_PLUGGRAM_META, RUNNING_PLUGGRAM_THREAD
+    pause_pluggram()
+
+    try:
+        RUNNING_PLUGGRAM = meta.init(*args)
+    except Exception as e:
+        LOG.error(f'exception {e.__class__.__name__} initializing pluggram "{meta.name}" ({meta.class_name}): {str(e)}')
+        LOG.error(traceback.format_exc())
+
+    RUNNING_PLUGGRAM_THREAD = _start_thread(meta)
+    RUNNING_PLUGGRAM_META = meta
+
+
+def pause_pluggram():
+    global RUNNING_PLUGGRAM, RUNNING_PLUGGRAM_META, RUNNING_PLUGGRAM_THREAD
+
+    if RUNNING_PLUGGRAM_THREAD is not None:
+        _stop_thread(RUNNING_PLUGGRAM_THREAD)
+
+    RUNNING_PLUGGRAM = None
+    RUNNING_PLUGGRAM_META = None

@@ -55,7 +55,7 @@ if len(pgm) > 0:
                 print(f'frame #{frame_count}')
                 frame_count += 1
 
-                if frame_count == 2:
+                if frame_count == 256:
                     break
     except KeyboardInterrupt:
         print('interrupted')

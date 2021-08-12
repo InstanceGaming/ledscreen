@@ -1,208 +1,158 @@
 import logging
 from flask import Blueprint, request
-from flask_restful import Api, Resource
-from common import LIMITER, SCREEN, THREADS
-from database import session
-from .authentication import auth_endpoint_allowed, get_auth_status
-from utils import enum_name_or_null, isoformat_or_null
-from models import (User,
-                    RunTarget,
-                    UserType,
-                    Workspace, RunLog)
+from flask_restful import Api, Resource, abort
 import system
+import pluggram
+
 
 LOG = logging.getLogger('ledscreen.web.api')
 bp = Blueprint('api', __name__, url_prefix='/api')
 api = Api(bp)
 
 
-class ResetSystem(Resource):
-    decorators = [LIMITER.limit("1/minute")]
+def key_or_session():
+    api_key = request.args.get('key', None)
 
-    def get(self):
-        if auth_endpoint_allowed(minimum_credential=UserType.ADMIN):
-            auth_result = get_auth_status()
+    if api_key is not None:
+        if api_key not in system.config['app.api_keys']:
+            LOG.debug(f'API key "{api_key}" not found, checking for cookie instead')
 
-            if auth_result is not None and auth_result.valid:
-                system.reset(True)
-
-                try:
-                    system.restart()
-                    return {}, 202
-                except:
-                    LOG.warning('requesting system restart failed')
-                    pass
-
-                return {'message': 'request to restart failed'}, 500
-        return {}, 403
-
-
-api.add_resource(ResetSystem, '/system/reset')
-
-
-class Workspaces(Resource):
-    decorators = [LIMITER.limit("10/minute")]
-
-    def get(self, wid: str):
-        if not auth_endpoint_allowed(minimum_credential=UserType.ADMIN):
-            return {}, 403
-
-        workspace = Workspace.query.get(wid)
-
-        if workspace is None:
-            return {}, 404
-
-        payload = {
-            'workspace': workspace.wid,
-            'created_at': isoformat_or_null(workspace.created_at),
-            'run_privilege': enum_name_or_null(workspace.run_privilege),
-            'max_runtime': workspace.max_runtime,
-            'run_target': enum_name_or_null(workspace.run_target),
-            'run_status': workspace.run_status.name,
-            'owner': workspace.owner
-        }
-        return payload, 200
-
-    def delete(self, wid: str):
-        if not auth_endpoint_allowed(minimum_credential=UserType.ADMIN):
-            return {}, 403
-
-        with session.begin():
-            workspace = Workspace.query.get(wid)
-
-        if workspace is None:
-            return {}, 404
-
-        result = system.remove_workspace(workspace)
-
-        return {'success': result, 'workspace': workspace.wid}, 200
-
-
-api.add_resource(Workspaces, '/workspace/<wid>')
-
-
-class RunWorkspace(Resource):
-    decorators = [LIMITER.limit("1/second")]
-
-    def post(self, wid: str):
-        if SCREEN is None:
-            return {'message': 'screen not initialized'}, 500
-
-        if not auth_endpoint_allowed(minimum_credential=UserType.STUDENT):
-            return {}, 403
-
-        with session.begin():
-            workspace = Workspace.query.get(wid)
-
-        if workspace is None:
-            return {}, 404
-
-        rid, thread = system.run_workspace(workspace, SCREEN, system.program_exit_callback)
-
-        if thread is not None:
-            THREADS.append(thread)
-            payload = {
-                'workspace': workspace.wid,
-                'run_log': rid,
-                'simulating': workspace.run_privilege == RunTarget.SIMULATE
-            }
-            return payload, 202
+            if system.is_user_authenticated():
+                return True
+            else:
+                return False
         else:
-            return {'message': 'failed to start workspace'}, 500
+            LOG.info(f'API key "{api_key}" was used for "{request.path}"')
+            return True
+    return False
 
 
-api.add_resource(RunWorkspace, '/workspace/<wid>/run')
+class RunPluggram(Resource):
 
-
-class RunLogs(Resource):
-    decorators = [LIMITER.limit("1/second")]
-
-    def get(self, rid: str):
-        if not auth_endpoint_allowed(minimum_credential=UserType.STUDENT):
+    def post(self, query_name: str):
+        if not key_or_session():
             return {}, 403
 
-        with session.begin():
-            run_log = RunLog.query.get(rid)
+        meta = None
 
-            if run_log is None:
-                return {}, 404
+        for pg in system.loaded_pluggrams:
+            if pg.name == query_name.lower().strip():
+                meta = pg
+                break
 
-            payload = {
-                'run_log': run_log.rid,
-                'started_at': run_log.started_at.isoformat(),
-                'stopped_at': run_log.stopped_at.isoformat(),
-                'exit_reason': run_log.exit_reason.name.lower(),
-                'return_code': run_log.return_code
-            }
-            return payload, 200
+        if meta is None:
+            return {'query_name': query_name}, 404
+        else:
+            pluggram.start_pluggram(meta, system.screen)
+            return {'query_name': query_name}, 200
 
 
-api.add_resource(RunLogs, '/run/<rid>')
+api.add_resource(RunPluggram, '/pluggram/<name>/run')
 
 
-class CreateWorkspace(Resource):
-    decorators = [LIMITER.limit("10/minute")]
+class PausePluggram(Resource):
 
     def post(self):
-        if not auth_endpoint_allowed(minimum_credential=UserType.ADMIN):
+        if not key_or_session():
             return {}, 403
 
-        content_length = request.content_length
+        clear_arg = request.args.get('clear', False)
 
-        content = None
-        if content_length > 0:
-            if content_length > 100000:
-                return {'message': 'file too large; max 100kB'}, 413
+        try:
+            clear = bool(clear_arg)
+        except ValueError:
+            return {'message': 'cannot parse "clear" argument'}, 400
 
-            content = request.get_data(as_text=True)
+        pluggram.pause_pluggram()
 
-        run_privilege_text = request.args.get('run_privilege')
-        run_privilege = None
+        if clear:
+            system.screen.clear()
 
-        if run_privilege_text is not None:
-            try:
-                run_privilege = RunTarget[run_privilege_text.upper()]
-            except ValueError:
-                return {'message': 'unknown run privilege'}, 400
-
-        max_runtime_text = request.args.get('max_runtime')
-        max_runtime = None
-
-        if max_runtime_text is not None:
-            try:
-                max_runtime = int(max_runtime_text)
-            except ValueError:
-                return {'message': 'cannot parse max_runtime'}, 400
-
-        workspace = system.create_workspace(py_contents=content,
-                                            run_privilege=run_privilege,
-                                            max_runtime=max_runtime)
-        return {'workspace': workspace.wid}, 200
+        return {}, 200
 
 
-api.add_resource(CreateWorkspace, '/workspace')
+api.add_resource(PausePluggram, '/pluggrams/pause')
 
 
-class LoginProbe(Resource):
-    decorators = [LIMITER.limit("20/minute")]
+class RunningPluggram(Resource):
 
     def get(self):
-        code_parameter = request.args.get('code')
+        name = None
 
-        if code_parameter is None:
-            return {}, 400
+        if pluggram.RUNNING_PLUGGRAM_META is not None:
+            name = pluggram.RUNNING_PLUGGRAM_META.name
 
-        user = User.query.get(code_parameter)
-        if user is not None:
-            # todo: if user is logged in, show more data
+        return {'name': name}, 200
 
-            payload = {
-                'locked': user.locked,
-                'requires_password': user.password is not None
+
+api.add_resource(RunningPluggram, '/pluggrams/running')
+
+
+class Pluggrams(Resource):
+
+    def get(self):
+        payload = []
+
+        for pg in system.loaded_pluggrams:
+            options_node = []
+
+            for opt in pg.options:
+                option_node = {
+                    'name': opt.key,
+                    'type': opt.type_name,
+                    'min': opt.min,
+                    'max': opt.max,
+                    'choices': opt.choices,
+                    'default_value': opt.default
+                }
+                options_node.append(option_node)
+
+            pluggram_node = {
+                'name': pg.name,
+                'display_name': pg.display_name,
+                'version': pg.version,
+                'description': pg.description,
+                'options': options_node
             }
-            return payload, 200
-        else:
-            return {}, 404
+            payload.append(pluggram_node)
+
+        return payload, 200
 
 
-api.add_resource(LoginProbe, '/auth/probe')
+api.add_resource(Pluggrams, '/pluggrams')
+
+
+class SystemRestart(Resource):
+
+    def post(self):
+        if not key_or_session():
+            return {}, 403
+
+        try:
+            system.restart()
+            return {}, 202
+        except:
+            LOG.warning('requesting system restart failed')
+
+        return {}, 200
+
+
+api.add_resource(SystemRestart, '/system/restart')
+
+
+class SystemPoweroff(Resource):
+
+    def post(self):
+        if not key_or_session():
+            return {}, 403
+
+        try:
+            system.shutdown()
+            return {}, 202
+        except:
+            LOG.warning('requesting system shutdown failed')
+
+        return {}, 200
+
+
+api.add_resource(SystemPoweroff, '/system/poweroff')
