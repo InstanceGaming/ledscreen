@@ -83,7 +83,7 @@ def authenticate_user(password: str):
 def is_user_authenticated() -> bool:
     cookie_value = request.cookies.get(AUTH_COOKIE_NAME)
     LOG.debug(
-        f'is_user_authenticated(): expired={user_state.expired} cookie_value={cookie_value} stored={user_state.session_token}')
+        f'auth check: expired={user_state.expired} cookie_value={cookie_value} stored={user_state.session_token}')
     if not user_state.expired:
         if user_state.validate_session(cookie_value):
             return True
@@ -127,10 +127,9 @@ def restart():
         raise NotImplementedError('Intentionally left unimplemented; this system is only used on Linux')
 
 
-def init(conf, pluggrams: List[PluggramMeta]):
-    global config, loaded_pluggrams, screen
+def init(conf):
+    global config, screen
     config = conf
-    loaded_pluggrams = pluggrams
     screen = Screen(
         config['screen.width'],
         config['screen.height'],

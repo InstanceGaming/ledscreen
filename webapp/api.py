@@ -44,6 +44,10 @@ class Screen:
         Get the screen area in pixels.
         """
         return self._w * self._h
+    
+    @property
+    def current_font(self):
+        return self._current_font
 
     @property
     def center(self):
@@ -96,7 +100,7 @@ class Screen:
     def _set_canvas(self, mode: str, color: int):
         self._canvas = self._create_canvas(mode, color)
         self._painter = ImageDraw.Draw(self._canvas)
-        self._painter.fontmode = '1'
+        self._painter.fontmode = self.antialiasing
 
     def _create_canvas(self, mode: str, color_data):
         return Image.new(mode, (self._w, self._h), color_data)
@@ -141,7 +145,12 @@ class Screen:
             return True
         else:
             try:
-                font_path = os.path.join(self._font_dir, name)
+                canonical_name = utils.canonical_filename(self._font_dir, name)
+
+                if canonical_name is None:
+                    raise FileNotFoundError()
+
+                font_path = os.path.join(self._font_dir, canonical_name)
                 ext = pathlib.Path(font_path).suffix
 
                 if ext == '.ttf':
@@ -159,13 +168,24 @@ class Screen:
         return False
 
     @lru_cache(100)
-    def text_dimensions(self, message: str) -> Tuple:
+    def text_dimensions(self,
+                        message: str,
+                        spacing=None,
+                        features=None,
+                        stroke_width=None) -> Tuple:
         """
         Get the x, y size of text with a given message.
         :param message: character sequence to consider
+        :param stroke_width: outline width
+        :param features: font engine arguments
+        :param spacing: distance between lines of text
         :return: width, height
         """
-        a, b = self._current_font.getsize(message)
+        a, b = self._painter.multiline_textsize(message,
+                                                self._current_font,
+                                                spacing=spacing or 4,
+                                                features=features,
+                                                stroke_width=stroke_width or 0)
         return a, b
 
     def index_of(self, x: int, y: int):

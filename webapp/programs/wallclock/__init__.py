@@ -21,7 +21,7 @@ class WallClock(Pluggram):
     ]
     FONT_REG = 'arial.ttf'
     FONT_BOLD = 'arialbd.ttf'
-    SMALL_FONT = 10
+    SMALL_FONT = 11
     LARGE_FONT = 12
 
     def __init__(self,
@@ -52,7 +52,7 @@ class WallClock(Pluggram):
         # format time
         colon = (":" if self._flasher else " ")
         second_text = f'{colon}%S' if self._show_seconds else ""
-        date_text = now.strftime('%a\n%b %m')
+        date_text = now.strftime('%A\n%b %m')
         time_text = now.strftime(f'%I{colon}%M{second_text}')
 
         center = self._screen.center

@@ -19,12 +19,11 @@ configure_logger(LOG)
 def create_app():
     config = load_config()
     LOG.info(f'loaded application config')
+    system.init(config)
 
     programs = pluggram.load(config['app.programs_dir'], 1)
     LOG.info(f'loaded {len(programs)} pluggrams')
-
-    system.init(config, programs)
-    LOG.debug('initialized global objects')
+    system.loaded_pluggrams.extend(programs)
 
     app = flask.Flask(__name__)
     app.url_map.strict_slashes = False

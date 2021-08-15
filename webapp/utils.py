@@ -182,6 +182,13 @@ def combine_rgb(r: int, g: int, b: int):
     return (r << 16) | (g << 8) | b
 
 
+def canonical_filename(directory: str, name: str):
+    for file in os.listdir(directory):
+        if file.lower().strip() == name.lower().strip():
+            return file
+    return None
+
+
 def timing_counter():
     """
     perf_counter() in milliseconds.

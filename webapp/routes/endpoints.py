@@ -1,4 +1,6 @@
 import logging
+import os
+
 from flask import Blueprint, request
 from flask_restful import Api, Resource, abort
 import system
@@ -11,20 +13,18 @@ api = Api(bp)
 
 
 def key_or_session():
-    api_key = request.args.get('key', None)
+    if system.is_user_authenticated():
+        return True
+    else:
+        api_key = request.args.get('key', None)
 
-    if api_key is not None:
-        if api_key not in system.config['app.api_keys']:
-            LOG.debug(f'API key "{api_key}" not found, checking for cookie instead')
-
-            if system.is_user_authenticated():
-                return True
+        if api_key is not None:
+            if api_key not in system.config['app.api_keys']:
+                LOG.debug(f'API key "{api_key}" not found, checking for cookie instead')
             else:
-                return False
-        else:
-            LOG.info(f'API key "{api_key}" was used for "{request.path}"')
-            return True
-    return False
+                LOG.info(f'API key "{api_key}" was used for "{request.path}"')
+                return True
+        return False
 
 
 class RunPluggram(Resource):
@@ -43,14 +43,14 @@ class RunPluggram(Resource):
         if meta is None:
             return {'query_name': query_name}, 404
         else:
-            pluggram.start_pluggram(meta, system.screen)
+            pluggram.runner.start(meta, system.screen)
             return {'query_name': query_name}, 200
 
 
-api.add_resource(RunPluggram, '/pluggram/<name>/run')
+api.add_resource(RunPluggram, '/pluggram/<query_name>/run')
 
 
-class PausePluggram(Resource):
+class StopPluggram(Resource):
 
     def post(self):
         if not key_or_session():
@@ -63,26 +63,27 @@ class PausePluggram(Resource):
         except ValueError:
             return {'message': 'cannot parse "clear" argument'}, 400
 
-        pluggram.pause_pluggram()
+        if pluggram.runner.running:
+            meta = pluggram.runner.meta
+            pluggram.runner.stop()
 
-        if clear:
-            system.screen.clear()
+            if clear:
+                system.screen.clear()
 
-        return {}, 200
+            return {'name': meta.name}, 200
+        return {'name': None}, 200
 
 
-api.add_resource(PausePluggram, '/pluggrams/pause')
+api.add_resource(StopPluggram, '/pluggrams/stop')
 
 
 class RunningPluggram(Resource):
 
     def get(self):
-        name = None
-
-        if pluggram.RUNNING_PLUGGRAM_META is not None:
-            name = pluggram.RUNNING_PLUGGRAM_META.name
-
-        return {'name': name}, 200
+        if pluggram.runner.running:
+            meta = pluggram.runner.meta
+            return {'name': meta.name, 'display_name': meta.display_name}, 200
+        return {'name': None, 'display_name': None}, 200
 
 
 api.add_resource(RunningPluggram, '/pluggrams/running')
@@ -120,6 +121,22 @@ class Pluggrams(Resource):
 
 
 api.add_resource(Pluggrams, '/pluggrams')
+
+
+class Fonts(Resource):
+
+    def get(self):
+        font_dir = system.config['screen.fonts_dir']
+        abs_path = os.path.abspath(font_dir)
+
+        if os.path.isdir(abs_path):
+            files = os.listdir(abs_path)
+            return files, 200
+        else:
+            return [], 404
+
+
+api.add_resource(Fonts, '/fonts')
 
 
 class SystemRestart(Resource):

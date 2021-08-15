@@ -1,4 +1,5 @@
 import enum
+import json
 import os
 import logging
 import importlib.util
@@ -9,16 +10,13 @@ import re
 import threading
 from multiprocessing import Event
 from inspect import Parameter
+
 from utils import timing_counter
 
 LOG = logging.getLogger('ledscreen.pluggram')
 INTERVAL_PATTERN = re.compile(r'(\d+)(ms|s|m)')
-NAME_KEY_PATTERN = re.compile(r'(^a-z0-9_)')
-
-RUNNING_PLUGGRAM = None
-RUNNING_PLUGGRAM_META = None
-RUNNING_PLUGGRAM_THREAD = None
-_EXIT_EVENT = Event()
+OPT_KEY_PATTERN = re.compile(r'(^a-z0-9_)')
+USER_OPTIONS_FILE = 'options.json'
 
 
 def parse_interval_text(raw_value):
@@ -125,8 +123,8 @@ class Option:
     def __init__(self, key: str, default, **kwargs):
         self._key = key
 
-        if NAME_KEY_PATTERN.match(key):
-            raise ValueError(f'"{key}" is invalid (matched with pattern "{NAME_KEY_PATTERN.pattern}")')
+        if OPT_KEY_PATTERN.match(key):
+            raise ValueError(f'"{key}" is invalid (matched with pattern "{OPT_KEY_PATTERN.pattern}")')
 
         self._default = default
         self._min = None
@@ -138,6 +136,26 @@ class Option:
 
         if self.type not in self.SUPPORTED_TYPES:
             raise TypeError(f'unsupported option type {self.type}')
+
+        min_val = kwargs.get('min')
+
+        if min_val is not None:
+            if isinstance(min_val, int):
+                self._min = min_val
+            else:
+                raise TypeError('min value must be an integer')
+
+        max_val = kwargs.get('max')
+
+        if max_val is not None:
+            if isinstance(max_val, int):
+                if min_val is not None:
+                    if max_val < min_val:
+                        raise ValueError('max value less than min value')
+
+                self._max = max_val
+            else:
+                raise TypeError('max value must be an integer')
 
         if self.type == str:
             choices = kwargs.get('choices')
@@ -151,26 +169,6 @@ class Option:
                 else:
                     raise TypeError('choices must be of type list')
         elif self.type == int:
-            min_val = kwargs.get('min')
-
-            if min_val is not None:
-                if isinstance(min_val, int):
-                    self._min = min_val
-                else:
-                    raise TypeError('min value must be an integer')
-
-            max_val = kwargs.get('max')
-
-            if max_val is not None:
-                if isinstance(max_val, int):
-                    if min_val is not None:
-                        if max_val < min_val:
-                            raise ValueError('max value less than min value')
-
-                    self._max = max_val
-                else:
-                    raise TypeError('max value must be an integer')
-
             if kwargs.get('color_picker'):
                 self._input_method = InputMethod.COLOR_PICKER
 
@@ -183,6 +181,13 @@ class Option:
                 if o in self._choices:
                     return True
             else:
+                if self._min is not None:
+                    if len(o) < self._min:
+                        return False
+                if self._max is not None:
+                    if len(o) > self._max:
+                        return False
+
                 return True
         elif isinstance(o, int):
             min_ok = False
@@ -239,6 +244,14 @@ class PluggramMeta:
     def tick_rate(self):
         return self._tick_rate
 
+    @property
+    def has_user_options(self):
+        return os.path.exists(self._store_path)
+
+    @property
+    def type(self):
+        return self._entry_class
+
     def __init__(self,
                  module,
                  module_path: str,
@@ -262,10 +275,52 @@ class PluggramMeta:
         self._version = version
         self._positional_count = positional_count
         self._options = options or []
+        self._store_path = os.path.join(self.module_path, USER_OPTIONS_FILE)
+        self._loaded_options = {}
+        self._instance = None
+
+    def validate_options(self, options: dict) -> list:
+        invalid_keys = []
+        known_keys = [o.key for o in self._options]
+        for key, value in options.items():
+            if key in known_keys:
+                for option in self._options:
+                    if option.key == key:
+                        if not option.validate(value):
+                            invalid_keys.append(key)
+                        break
+
+        return invalid_keys
+
+    def save_options(self, options: dict):
+        store_obj = {}
+
+        for key, value in options.values():
+            for opt in self._options:
+                if key == opt.key:
+                    if opt.validate(value) and value != opt.default:
+                        store_obj.update({key: value})
+                    break
+
+        with open(self._store_path, 'w') as sf:
+            json.dump(store_obj, sf)
+
+    def load_options(self):
+        with open(self._store_path, 'r') as sf:
+            raw_data = json.load(sf)
+
+        for key, value in raw_data:
+            for opt in self._options:
+                if key == opt.key:
+                    if opt.validate(value) and value != opt.default:
+                        self._loaded_options.update({key: value})
+                    break
 
     def init(self, *args, **kwargs):
         if len(args) < self._positional_count:
             raise RuntimeError(f'Argument mismatch (wants {self._positional_count})')
+
+        options = self._loaded_options
 
         known_keys = [o.key for o in self._options]
         for key, value in kwargs.items():
@@ -273,11 +328,10 @@ class PluggramMeta:
                 known_keys.remove(key)
                 for option in self._options:
                     if option.key == key:
-                        valid = option.validate(value)
-
-                        if not valid:
-                            raise ValueError(f'Option "{key}" has invalid value')
-
+                        if option.validate(value):
+                            options.update({key: value})
+                        else:
+                            raise ValueError(f'Kwarg option "{key}" has invalid value')
                         break
 
         for unset_key in known_keys:
@@ -286,11 +340,17 @@ class PluggramMeta:
                     default_value = option.default
                     break
             else:
-                raise RuntimeError(f'Failed to find default value for unset kwarg "{unset_key}"')
+                raise RuntimeError(f'Failed to find default value for unset option "{unset_key}"')
 
-            kwargs.update({unset_key: default_value})
+            options.update({unset_key: default_value})
 
-        return self._entry_class(*args, **kwargs)
+        self._instance = self._entry_class(*args, **options)
+
+    def tick(self):
+        if self._instance is None:
+            raise RuntimeError('cannot tick() as pluggram was never initialized')
+
+        self._instance.tick()
 
 
 class Pluggram:
@@ -432,51 +492,60 @@ def load(programs_dir: str, argument_count):
     return pluggram_metas
 
 
-def _pluggram_worker(meta: PluggramMeta, instance: Pluggram):
-    rate = meta.tick_rate
-    marker = -rate
-    while True:
-        if (rate is not None and timing_counter() - marker > rate) or rate is None:
-            marker = timing_counter()
-            try:
-                instance.tick()
-            except Exception as e:
-                LOG.error(f'exception while updating pluggram "{meta.name}": {str(e)}')
-                LOG.error(traceback.format_exc())
-        if _EXIT_EVENT.is_set():
-            break
+class PluggramRunner:
+
+    @property
+    def meta(self):
+        return self._meta
+
+    @property
+    def running(self):
+        return self._meta is not None and self._thread is not None and self._thread.is_alive()
+
+    def __init__(self):
+        self._thread = None
+        self._meta = None
+        self._event_stop = Event()
+
+    def _worker(self):
+        rate = self._meta.tick_rate
+        marker = -rate
+        while True:
+            if (rate is not None and timing_counter() - marker > rate) or rate is None:
+                marker = timing_counter()
+                try:
+                    self._meta.tick()
+                except Exception as e:
+                    LOG.error(f'exception while ticking pluggram "{self._meta.name}": {str(e)}')
+                    LOG.error(traceback.format_exc())
+            if self._event_stop.is_set():
+                break
+
+    def start(self, meta: PluggramMeta, *args, **kwargs) -> bool:
+        self.stop()
+        self._event_stop.clear()
+
+        try:
+            meta.init(*args, **kwargs)
+        except Exception as e:
+            LOG.error(
+                f'exception {e.__class__.__name__} initializing pluggram "{meta.name}" ({meta.class_name}): {str(e)}')
+            LOG.error(traceback.format_exc())
+            return False
+
+        self._meta = meta
+        self._thread = threading.Thread(target=self._worker)
+        self._thread.start()
+
+        return True
+
+    def stop(self):
+        if self.running:
+            self._event_stop.set()
+            self._thread.join()
+            self._meta = None
+            return True
+        return False
 
 
-def _start_thread(pluggram: PluggramMeta):
-    t = threading.Thread(target=_pluggram_worker, args=[pluggram])
-    t.start()
-    return t
-
-
-def _stop_thread(thread: threading.Thread):
-    _EXIT_EVENT.set()
-    thread.join()
-
-
-def start_pluggram(meta: PluggramMeta, *args):
-    global RUNNING_PLUGGRAM, RUNNING_PLUGGRAM_META, RUNNING_PLUGGRAM_THREAD
-    pause_pluggram()
-
-    try:
-        RUNNING_PLUGGRAM = meta.init(*args)
-    except Exception as e:
-        LOG.error(f'exception {e.__class__.__name__} initializing pluggram "{meta.name}" ({meta.class_name}): {str(e)}')
-        LOG.error(traceback.format_exc())
-
-    RUNNING_PLUGGRAM_THREAD = _start_thread(meta)
-    RUNNING_PLUGGRAM_META = meta
-
-
-def pause_pluggram():
-    global RUNNING_PLUGGRAM, RUNNING_PLUGGRAM_META, RUNNING_PLUGGRAM_THREAD
-
-    if RUNNING_PLUGGRAM_THREAD is not None:
-        _stop_thread(RUNNING_PLUGGRAM_THREAD)
-
-    RUNNING_PLUGGRAM = None
-    RUNNING_PLUGGRAM_META = None
+runner = PluggramRunner()
