@@ -4,6 +4,7 @@ from api import Screen
 from pluggram import load
 import traceback
 import argparse
+import system
 
 
 def get_cla():
@@ -54,6 +55,8 @@ if __name__ == '__main__':
         if not os.path.isdir(frames_dir):
             print('Frame output path does not exist or is not a directory')
             exit(2)
+
+    system.screen = screen
 
     loaded_pluggrams = load('programs', 1)
     print(f'loaded {len(loaded_pluggrams)} pluggrams')

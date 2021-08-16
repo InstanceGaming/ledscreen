@@ -48,6 +48,10 @@ class Screen:
     @property
     def current_font(self):
         return self._current_font
+    
+    @property
+    def fonts_dir(self):
+        return self._fonts_dir
 
     @property
     def center(self):
@@ -81,7 +85,7 @@ class Screen:
         self._w = w
         self._h = h
         self._output_pin = output_pin
-        self._font_dir = os.path.abspath(fonts_dir)
+        self._fonts_dir = os.path.abspath(fonts_dir)
         self._cached_fonts = {'default': ImageFont.load_default()}
         self._current_font = self._cached_fonts['default']
         self._canvas = self._create_canvas(self.COLOR_MODE, 0)
@@ -145,12 +149,12 @@ class Screen:
             return True
         else:
             try:
-                canonical_name = utils.canonical_filename(self._font_dir, name)
+                canonical_name = utils.canonical_filename(self._fonts_dir, name)
 
                 if canonical_name is None:
                     raise FileNotFoundError()
 
-                font_path = os.path.join(self._font_dir, canonical_name)
+                font_path = os.path.join(self._fonts_dir, canonical_name)
                 ext = pathlib.Path(font_path).suffix
 
                 if ext == '.ttf':
@@ -163,7 +167,7 @@ class Screen:
                 self._cached_fonts.update({unique_name: self._current_font})
                 return True
             except OSError:
-                LOG.debug(f'failed to load font "{name}" from "{self._font_dir}"')
+                LOG.debug(f'failed to load font "{name}" from "{self._fonts_dir}"')
 
         return False
 

@@ -8,7 +8,7 @@ import os
 
 
 def get_font_names():
-    font_dir = os.path.abspath(system.config['screen.fonts_dir'])
+    font_dir = os.path.abspath(system.screen.fonts_dir)
 
     if os.path.isdir(font_dir):
         return os.listdir(font_dir)
@@ -98,9 +98,9 @@ class ScrollingText(Pluggram):
 
                 if self._randomize:
                     self._fg = utils.combine_rgb(
-                        random.randrange(0, 0xFF),
-                        random.randrange(0, 0xFF),
-                        random.randrange(0, 0xFF)
+                        random.randrange(0x11, 0xFF),
+                        random.randrange(0x11, 0xFF),
+                        random.randrange(0x11, 0xFF)
                     )
             else:
                 self._x -= self._frame_skip
