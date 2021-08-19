@@ -1,3 +1,4 @@
+import json
 import os
 from utils import timing_counter
 from api import Screen
@@ -80,6 +81,8 @@ if __name__ == '__main__':
             except OSError as e:
                 print(f'error occurred loading user options: {str(e)}')
                 exit(12)
+            except json.JSONDecodeError as e:
+                print(f'could not parse user options JSON: {str(e)}')
 
             print(f'loaded user preferences')
 

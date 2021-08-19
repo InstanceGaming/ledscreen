@@ -8,8 +8,10 @@ import traceback as tb
 import inspect
 import re
 import threading
+from collections import KeysView
 from multiprocessing import Event
 from inspect import Parameter
+from typing import Optional, Tuple
 
 from utils import timing_counter
 
@@ -173,9 +175,12 @@ class Option:
                 self._input_method = InputMethod.COLOR_PICKER
 
     def __repr__(self):
-        return f'<Option "{self._key}" {self.type_name} default={self._default}>'
+        return f'<Option "{self._key}" {self.type_name} default={self._default} value={self._value}>'
 
     def validate(self, o):
+        if not isinstance(o, self.type):
+            return False
+
         if isinstance(o, str):
             if self._choices is not None:
                 if o in self._choices:
@@ -207,7 +212,7 @@ class Option:
                 max_ok = True
 
             return min_ok and max_ok
-        return isinstance(o, self.type)
+        raise NotImplementedError()
 
 
 class PluggramMeta:
@@ -252,6 +257,10 @@ class PluggramMeta:
     def type(self):
         return self._entry_class
 
+    @property
+    def initialized(self):
+        return self._instance is not None
+
     def __init__(self,
                  module,
                  module_path: str,
@@ -277,42 +286,52 @@ class PluggramMeta:
         self._options = options or []
         self._store_path = os.path.join(self.module_path, USER_OPTIONS_FILE)
         self._loaded_options = {}
+        self._last_init_params: Optional[Tuple[list, dict]] = None
         self._instance = None
 
     def validate_options(self, options: dict) -> list:
         invalid_keys = []
-        known_keys = [o.key for o in self._options]
         for key, value in options.items():
-            if key in known_keys:
-                for option in self._options:
-                    if option.key == key:
-                        if not option.validate(value):
-                            invalid_keys.append(key)
-                        break
+            for option in self._options:
+                if option.key == key:
+                    if not option.validate(value):
+                        invalid_keys.append(key)
+                    break
 
         return invalid_keys
 
-    def save_options(self, options: dict):
+    def save_options(self, options: dict) -> KeysView:
         store_obj = {}
-
-        for key, value in options.values():
+        for key, value in options.items():
             for opt in self._options:
-                if key == opt.key:
-                    if opt.validate(value) and value != opt.default:
-                        store_obj.update({key: value})
+                if opt.key == key:
                     break
+            else:
+                raise KeyError(f'Key "{key}" cannot be mapped to Option')
+
+            if not opt.validate(value):
+                raise ValueError(f'Key "{key}" type or value "{value}" not valid')
+
+            if value != opt.default:
+                store_obj.update({key: value})
 
         with open(self._store_path, 'w') as sf:
             json.dump(store_obj, sf)
 
+        return store_obj.keys()
+
     def load_options(self):
         with open(self._store_path, 'r') as sf:
-            raw_data = json.load(sf)
+            root_node: dict = json.load(sf)
 
-        for key, value in raw_data:
+        for key, value in root_node.items():
             for opt in self._options:
                 if key == opt.key:
-                    if opt.validate(value) and value != opt.default:
+                    if not opt.validate(value):
+                        LOG.warning(f'Validation failed for user option "{key}" from file, using default value')
+                        continue
+
+                    if value != opt.default:
                         self._loaded_options.update({key: value})
                     break
 
@@ -331,20 +350,29 @@ class PluggramMeta:
                         if option.validate(value):
                             options.update({key: value})
                         else:
-                            raise ValueError(f'Kwarg option "{key}" has invalid value')
+                            raise ValueError(f'Option "{key}" has invalid value')
                         break
 
         for unset_key in known_keys:
             for option in self._options:
                 if option.key == unset_key:
-                    default_value = option.default
-                    break
-            else:
-                raise RuntimeError(f'Failed to find default value for unset option "{unset_key}"')
-
-            options.update({unset_key: default_value})
+                    if unset_key not in options.keys():
+                        options.update({unset_key: option.default})
+                        break
 
         self._instance = self._entry_class(*args, **options)
+
+    def reload(self):
+        if self._last_init_params is None:
+            raise RuntimeError('Cannot reload pluggram that was never initialized')
+
+        args = self._last_init_params[0]
+        kwargs = self._last_init_params[1]
+
+        if len(args) > 0:
+            self.init(*args, **kwargs)
+        else:
+            self.init(**kwargs)
 
     def tick(self):
         if self._instance is None:

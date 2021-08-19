@@ -12,6 +12,7 @@ class BackSoon(Pluggram):
     TICK_RATE = '500ms'
     OPTIONS = [
         Option('brightness', 128, min=1, max=MAX_BRIGHTNESS),
+        Option('minutes', 5, min=1),
         Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True),
         Option('background', 0, min=0, max=0xFFFFFF, color_picker=True)
     ]
@@ -23,9 +24,10 @@ class BackSoon(Pluggram):
         self._brightness = options['brightness']
         self._foreground = options['foreground']
         self._background = options['background']
+        self._minutes = options['minutes']
         self._start = datetime.now()
         self._posted_text = self._start.strftime('%I:%M%p')
-        self._end = datetime.now() + timedelta(minutes=1)
+        self._end = datetime.now() + timedelta(minutes=self._minutes)
         self._screen = screen
         self._flasher = True
 

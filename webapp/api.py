@@ -100,6 +100,7 @@ class Screen:
                                         gpio_channel)
         self.set_brightness(brightness)
         self._matrix.begin()
+        self.clear()
 
     def _set_canvas(self, mode: str, color: int):
         self._canvas = self._create_canvas(mode, color)

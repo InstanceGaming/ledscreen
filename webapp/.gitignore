@@ -9,3 +9,4 @@ config.toml
 frames/*.png
 frames/*.jpg
 frames/*.jpeg
+**/options.json

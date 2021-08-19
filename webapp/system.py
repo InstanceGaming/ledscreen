@@ -6,10 +6,9 @@ import subprocess
 import utils
 from flask import request
 from datetime import datetime, timedelta
-from typing import Optional, List
-
+from typing import Optional
 from api import Screen
-from pluggram import PluggramMeta
+
 
 VERSION = '1.0.0'
 LOG = logging.getLogger('ledscreen.system')

@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 
 from flask import Blueprint, request
 from flask_restful import Api, Resource, abort
@@ -75,6 +76,49 @@ class StopPluggram(Resource):
 
 
 api.add_resource(StopPluggram, '/pluggrams/stop')
+
+
+class PluggramOptions(Resource):
+
+    def post(self, query_name: str):
+        if not key_or_session():
+            return {}, 403
+
+        meta: Optional[pluggram.PluggramMeta] = None
+
+        for pg in system.loaded_pluggrams:
+            if pg.name == query_name.lower().strip():
+                meta = pg
+                break
+
+        if meta is None:
+            return {'query_name': query_name}, 404
+        else:
+            values = {}
+            keys = [o.key for o in meta.options]
+
+            for key, value in request.args.items():
+                key = key.lower()
+
+                if key in keys:
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        pass
+
+                    values.update({key: value})
+
+            invalid_keys = meta.validate_options(values)
+            saved_keys = []
+
+            if len(invalid_keys) < 1:
+                saved_keys = meta.save_options(values)
+
+            did_save = len(saved_keys) > 0 and len(values.keys()) > 0
+            return {'query_name': query_name, 'invalid_keys': invalid_keys, 'saved': did_save}, 200
+
+
+api.add_resource(PluggramOptions, '/pluggram/<query_name>/options')
 
 
 class RunningPluggram(Resource):

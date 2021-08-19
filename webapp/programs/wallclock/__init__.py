@@ -21,8 +21,8 @@ class WallClock(Pluggram):
     ]
     FONT_REG = 'arial.ttf'
     FONT_BOLD = 'arialbd.ttf'
-    SMALL_FONT = 11
-    LARGE_FONT = 12
+    SMALL_FONT = 10
+    LARGE_FONT = 13
 
     def __init__(self,
                  screen: Screen,
@@ -64,7 +64,7 @@ class WallClock(Pluggram):
                                    self._foreground,
                                    date_text,
                                    anchor='ma',
-                                   spacing=0,
+                                   spacing=1,
                                    alignment='center')
             self._screen.set_font(self.FONT_BOLD, size=self.LARGE_FONT)
 
