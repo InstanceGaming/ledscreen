@@ -36,12 +36,49 @@ def get_config_path():
     return os.environ.get('LS_CONFIG')
 
 
-def _config_node_or_exit(config: DottedDict, key: str):
-    value = config.get(key)
-    if value is None:
-        LOG.error(f'"{key}" path must be defined in config')
-        exit(3)
-    return value
+class ConfigValidator:
+
+    def __init__(self, path, data: DottedDict, parent=None, node_name=None):
+        self._path = path
+        self._data = data
+        self._parent = parent
+        self._name = node_name
+        self._validators = []
+
+    def addValidator(self, node_name: str):
+        sv = ConfigValidator(self._path, self._data, self, node_name)
+        self._validators.append(sv)
+        return sv
+
+    def getAbsoluteKey(self, relative_key: str):
+        if self._parent is None:
+            raise NotImplementedError('Cannot validate root-level nodes')
+        else:
+            if self._name is None:
+                raise RuntimeError('Sub-validator was never given name')
+
+        if '.' in relative_key:
+            raise KeyError('Relative key cannot change depth (contain dots)')
+
+        return '.'.join([self._name, relative_key])
+
+    def getValue(self, relative_key: str):
+        abs_key = self.getAbsoluteKey(relative_key)
+        return self._data.get(abs_key)
+
+    def validate(self, relative_key: str, required_type=None):
+        abs_key = self.getAbsoluteKey(relative_key)
+
+        if abs_key in self._data:
+            value = self._data[abs_key]
+
+            if required_type is not None:
+                if not isinstance(value, required_type):
+                    LOG.error(f'"{abs_key}" must be of type {required_type.__name__}')
+                    exit(3)
+        else:
+            LOG.error(f'"{abs_key}" must be defined')
+            exit(3)
 
 
 def load_config():
@@ -67,40 +104,41 @@ def load_config():
         LOG.error(f'config missing at "{config_path}"')
         exit(1)
 
-    _config_node_or_exit(config, 'server')
-    _config_node_or_exit(config, 'server.host')
-    _config_node_or_exit(config, 'server.port')
+    root = ConfigValidator(config_path, config)
 
-    _config_node_or_exit(config, 'app')
-    _config_node_or_exit(config, 'app.secret')
-    _config_node_or_exit(config, 'app.programs_dir')
-    _config_node_or_exit(config, 'app.minification')
-    _config_node_or_exit(config, 'app.api_keys')
+    server = root.addValidator('server')
+    server.validate('host', str)
+    server.validate('port', int)
+    server.validate('iface', str)
 
-    if not isinstance(config['app.api_keys'], DottedList):
-        LOG.error(f'{config_path}: "app.api_keys" must be a list')
-        exit(3)
+    app = root.addValidator('app')
+    app.validate('secret', str)
+    app.validate('programs_dir', str)
+    app.validate('minification', bool)
+    app.validate('api_keys', DottedList)
+    app.validate('max_session_minutes', int)
 
-    _config_node_or_exit(config, 'app.max_session_minutes')
+    user = root.addValidator('user')
+    user.validate('name', str)
+    user.validate('password', str)
 
-    _config_node_or_exit(config, 'user')
-    _config_node_or_exit(config, 'user.name')
-    _config_node_or_exit(config, 'user.password')
+    screen = root.addValidator('screen')
+    screen.validate('width', int)
+    screen.validate('height', int)
+    screen.validate('frequency', int)
+    screen.validate('brightness', int)
+    screen.validate('dma_channel', int)
+    screen.validate('gpio_pin', int)
+    screen.validate('gpio_channel', int)
+    screen.validate('inverted', bool)
+    screen.validate('fonts_dir', str)
 
-    _config_node_or_exit(config, 'screen')
-    _config_node_or_exit(config, 'screen.width')
-    _config_node_or_exit(config, 'screen.height')
-    _config_node_or_exit(config, 'screen.frequency')
-    _config_node_or_exit(config, 'screen.brightness')
-    _config_node_or_exit(config, 'screen.dma_channel')
-    _config_node_or_exit(config, 'screen.gpio_pin')
-    _config_node_or_exit(config, 'screen.gpio_channel')
-    _config_node_or_exit(config, 'screen.inverted')
-    _config_node_or_exit(config, 'screen.fonts_dir')
+    fonts_dir = screen.getValue('fonts_dir')
 
-    if not os.path.isdir(config['screen.fonts_dir']):
-        LOG.error(f'{config_path}: "screen.fonts_dir" must be a valid directory')
-        exit(3)
+    if fonts_dir is not None:
+        if not os.path.isdir(fonts_dir):
+            LOG.error(f'{config_path}: "screen.fonts_dir" must be a valid directory')
+            exit(3)
 
     return config
 

@@ -1,5 +1,6 @@
 import enum
 import json
+import numbers
 import os
 import logging
 import importlib.util
@@ -66,7 +67,7 @@ class InputMethod(enum.IntEnum):
 
 
 class Option:
-    SUPPORTED_TYPES = [int, str, bool]
+    SUPPORTED_TYPES = [int, float, str, bool]
 
     @property
     def key(self):
@@ -140,24 +141,7 @@ class Option:
             raise TypeError(f'unsupported option type {self.type}')
 
         min_val = kwargs.get('min')
-
-        if min_val is not None:
-            if isinstance(min_val, int):
-                self._min = min_val
-            else:
-                raise TypeError('min value must be an integer')
-
         max_val = kwargs.get('max')
-
-        if max_val is not None:
-            if isinstance(max_val, int):
-                if min_val is not None:
-                    if max_val < min_val:
-                        raise ValueError('max value less than min value')
-
-                self._max = max_val
-            else:
-                raise TypeError('max value must be an integer')
 
         if self.type == str:
             choices = kwargs.get('choices')
@@ -170,9 +154,50 @@ class Option:
                     self._choices = choices
                 else:
                     raise TypeError('choices must be of type list')
-        elif self.type == int:
+
+            if min_val is not None:
+                if isinstance(min_val, int):
+                    if min_val < 1:
+                        raise ValueError('min value for string must be at least 1')
+
+                    self._min = min_val
+                else:
+                    raise TypeError('min value must be an integer')
+
+            if max_val is not None:
+                if isinstance(max_val, int):
+                    if min_val is not None:
+                        if max_val < min_val:
+                            raise ValueError('max value less than min value')
+
+                    self._max = max_val
+                else:
+                    raise TypeError('max value must be an integer')
+        elif self.type == int or self.type == float:
             if kwargs.get('color_picker'):
+                if self.type == float:
+                    raise ValueError('cannot use color picker dialog for float type')
+
                 self._input_method = InputMethod.COLOR_PICKER
+
+            if min_val is not None:
+                if isinstance(min_val, (int, float)):
+                    self._min = min_val
+                else:
+                    raise TypeError('min value must be an integral')
+
+            if max_val is not None:
+                if isinstance(max_val, (int, float)):
+                    if min_val is not None:
+                        if type(max_val) != type(min_val):
+                            raise ValueError('min/max values must be the same type')
+
+                        if max_val < min_val:
+                            raise ValueError('max value less than min value')
+
+                    self._max = max_val
+                else:
+                    raise TypeError('max value must be an integral')
 
     def __repr__(self):
         return f'<Option "{self._key}" {self.type_name} default={self._default} value={self._value}>'

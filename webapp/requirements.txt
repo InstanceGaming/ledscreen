@@ -7,3 +7,4 @@ dotted
 eventlet
 kombu
 pillow
+netifaces

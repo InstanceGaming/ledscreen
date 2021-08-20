@@ -7,7 +7,7 @@ import logging
 import pluggram
 import wsio
 import system
-from api import Screen
+import netutils
 from utils import load_config, configure_logger
 from flask_minify import minify
 
@@ -44,6 +44,39 @@ def create_app():
 
     socketio = wsio.init_flask(app)
     LOG.debug('initialized socket io')
+
+    ip_addr = None
+    try:
+        ip_addr = netutils.get_ip_address(config['server.iface'])
+    except Exception as e:
+        LOG.warning(f'failed to get IPv4 address: {str(e)}')
+
+    system.screen.set_font('slkscr.ttf', 9)
+    system.screen.draw_text((0, 0),
+                            color=0xFFFFFF,
+                            message=f'V{system.VERSION}',
+                            anchor='lt',
+                            alignment='left')
+    system.screen.draw_text((system.screen.width, 0),
+                            color=0xFFFFFF,
+                            message='JLJ',
+                            anchor='rt',
+                            alignment='right')
+    if ip_addr is not None:
+        parts = ip_addr.split('.')
+
+        for i, part in enumerate(parts, start=1):
+            system.screen.draw_text((0, 6 * i),
+                                    color=0x00FFFF,
+                                    message=(part if i == len(parts) else f'{part}.'),
+                                    anchor='lt',
+                                    alignment='left')
+    else:
+        system.screen.draw_text((0, 6),
+                                color=0x0000FF,
+                                message='IFP FAIL',
+                                anchor='lt',
+                                alignment='left')
 
     return socketio, app, config
 

@@ -70,7 +70,7 @@ if __name__ == '__main__':
                 pgm = pg
                 break
         else:
-            print(f'"{selection_name}" not found')
+            print(f'"{selection_name}" not found or was disqualified')
             exit(11)
 
         print(f'selected "{pgm.name}"')

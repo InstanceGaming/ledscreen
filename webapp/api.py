@@ -102,13 +102,22 @@ class Screen:
         self._matrix.begin()
         self.clear()
 
-    def _set_canvas(self, mode: str, color: int):
-        self._canvas = self._create_canvas(mode, color)
+    def _setup_painter(self):
         self._painter = ImageDraw.Draw(self._canvas)
         self._painter.fontmode = self.antialiasing
 
+    def _set_canvas(self, mode: str, color: int):
+        self._canvas = self._create_canvas(mode, color)
+        self._setup_painter()
+
     def _create_canvas(self, mode: str, color_data):
         return Image.new(mode, (self._w, self._h), color_data)
+
+    def swap_frame(self, img: Image, update_painter=False):
+        self._canvas.paste(img)
+
+        if update_painter:
+            self._setup_painter()
 
     def render(self):
         for i, (r, g, b) in enumerate(self._canvas.getdata()):

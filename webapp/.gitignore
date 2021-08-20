@@ -6,7 +6,7 @@ run/**
 archived/**
 fonts/**
 config.toml
-frames/*.png
-frames/*.jpg
-frames/*.jpeg
+**/*.png
+**/*.jpg
+**/*.jpeg
 **/options.json
