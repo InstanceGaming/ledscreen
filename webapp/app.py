@@ -23,6 +23,12 @@ def create_app():
 
     programs = pluggram.load(config['app.programs_dir'], 1)
     LOG.info(f'loaded {len(programs)} pluggrams')
+
+    for program in programs:
+        if program.has_user_options:
+            program.load_options()
+
+    LOG.info(f'loaded pluggram user settings')
     system.loaded_pluggrams.extend(programs)
 
     app = flask.Flask(__name__)

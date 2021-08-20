@@ -80,9 +80,15 @@ def authenticate_user(password: str):
 
 
 def is_user_authenticated() -> bool:
+    address = request.remote_addr
+
+    if address is None or address == '':
+        address = '???.???.???.???'
+
     cookie_value = request.cookies.get(AUTH_COOKIE_NAME)
-    LOG.debug(
-        f'auth check: expired={user_state.expired} cookie_value={cookie_value} stored={user_state.session_token}')
+    LOG.info(
+        f'auth check from {address} path="{request.path}" '
+        f'expired={user_state.expired} token={cookie_value}')
     if not user_state.expired:
         if user_state.validate_session(cookie_value):
             return True

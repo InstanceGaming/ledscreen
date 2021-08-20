@@ -6,8 +6,10 @@
     <title>Manage</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/css/iziToast.min.css">
     <script src="/static/js/jquery.min.js"></script>
     <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/iziToast.min.js" defer></script>
     <script src="/static/js/manage.js" defer></script>
     <style>
         body {
@@ -62,7 +64,7 @@
 </head>
 <body>
 {% for program in programs %}
-<div class="modal" tabindex="-1" id="settings-modal-{{ program.name }}">
+<div class="modal" tabindex="-1" data-program-name="{{ program.name }}" id="settings-modal-{{ program.name }}">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -83,18 +85,20 @@
                             {% if opt.input_method == 1 %}
                                 <input type="color" class="form-control form-control-color"
                                        id="setting-input-{{ opt.markup_id }}"
-                                       value="#{{ '%x' | format(opt.default) }}"
+                                       data-program-option="{{ opt.markup_id }}"
+                                       value="#{{ '%x' | format(opt.value) }}"
                                        title="Pick a color">
                             {% else %}
                                 <input type="number"
                                        class="form-control"
-                                       value="{{ opt.default }}"
+                                       value="{{ opt.value }}"
                                        {% if opt.min %}
                                        min="{{ opt.min }}"
                                        {% endif %}
                                        {% if opt.max %}
                                        max="{{ opt.max }}"
                                        {% endif %}
+                                       data-program-option="{{ opt.markup_id }}"
                                        id="setting-input-{{ opt.markup_id }}"/>
                             {% endif %}
                             </div>
@@ -104,7 +108,8 @@
                             <div class="col-sm-7 offset-sm-5">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox"
-                                           checked="{{ 'on' if opt.default else 'off' }}"
+                                           checked="{{ 'on' if opt.value else 'off' }}"
+                                           data-program-option="{{ opt.markup_id }}"
                                            id="setting-input-{{ opt.markup_id }}"/>
                                     <label class="form-check-label"
                                            for="setting-input-{{ opt.markup_id }}"
@@ -122,10 +127,10 @@
                                 {{ opt.display_name }}
                             </label>
                             <div class="col-sm-7">
-                                <select class="form-select" aria-label="Possible values of {{ opt.display_name }}">
+                                <select class="form-select" data-program-option="{{ opt.markup_id }}" aria-label="Possible values of {{ opt.display_name }}">
                                     {% for choice in opt.choices %}
-                                        {% if choice == opt.default %}
-                                            <option value="{{choice}}" selected>{{ opt.default }}</option>
+                                        {% if choice == opt.value %}
+                                            <option value="{{choice}}" selected>{{ opt.value }}</option>
                                         {% else %}
                                             <option value="{{choice}}">{{ choice }}</option>
                                         {% endif%}
@@ -143,7 +148,8 @@
                             <div class="col-sm-7">
                                 <input type="text"
                                        class="form-control"
-                                       value="{{ opt.default }}"
+                                       value="{{ opt.value }}"
+                                       data-program-option="{{ opt.markup_id }}"
                                        id="setting-input-{{ opt.markup_id }}"/>
                             </div>
                         </div>
@@ -153,7 +159,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary">Save changes</button>
+                <button type="button" class="btn btn-primary settings-modal-submit">Save changes</button>
             </div>
         </div>
     </div>
@@ -192,14 +198,6 @@
             <div class="col-lg-4"></div>
             <div class="col-lg-4">
                 <div class="my-3">
-                    <div class="card card-panel">
-                        <div class="card-panel card-header">
-                            Screen Preview
-                        </div>
-                        <div class="card-body p-0 text-center">
-                            <img id="screen-preview" src="/static/images/preview-placeholder.png" alt="Screen preview image">
-                        </div>
-                    </div>
                     {% if programs|length > 0 %}
                     <div class="card card-panel">
                         <div class="card-panel card-header">

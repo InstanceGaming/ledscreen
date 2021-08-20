@@ -83,7 +83,7 @@ class Option:
 
     @property
     def type(self):
-        return type(self._default)
+        return type(self.default)
 
     @property
     def type_name(self):
@@ -135,10 +135,13 @@ class Option:
         self._choices = None
         self._help_text = kwargs.get('help')
         self._input_method = InputMethod.DEFAULT
-        self._value = None
+        self._value = default
 
         if self.type not in self.SUPPORTED_TYPES:
             raise TypeError(f'unsupported option type {self.type}')
+
+        if not self.validate(default):
+            raise ValueError(f'Default value of option "{key}" is invalid')
 
         min_val = kwargs.get('min')
         max_val = kwargs.get('max')
@@ -310,7 +313,6 @@ class PluggramMeta:
         self._positional_count = positional_count
         self._options = options or []
         self._store_path = os.path.join(self.module_path, USER_OPTIONS_FILE)
-        self._loaded_options = {}
         self._last_init_params: Optional[Tuple[list, dict]] = None
         self._instance = None
 
@@ -327,17 +329,17 @@ class PluggramMeta:
 
     def save_options(self, options: dict) -> KeysView:
         store_obj = {}
+        previous_value = None
         for key, value in options.items():
             for opt in self._options:
                 if opt.key == key:
+                    previous_value = opt.value
+                    opt.value = value
                     break
             else:
                 raise KeyError(f'Key "{key}" cannot be mapped to Option')
 
-            if not opt.validate(value):
-                raise ValueError(f'Key "{key}" type or value "{value}" not valid')
-
-            if value != opt.default:
+            if previous_value is None or (value != previous_value):
                 store_obj.update({key: value})
 
         with open(self._store_path, 'w') as sf:
@@ -352,19 +354,19 @@ class PluggramMeta:
         for key, value in root_node.items():
             for opt in self._options:
                 if key == opt.key:
-                    if not opt.validate(value):
-                        LOG.warning(f'Validation failed for user option "{key}" from file, using default value')
-                        continue
-
                     if value != opt.default:
-                        self._loaded_options.update({key: value})
+                        try:
+                            opt.value = value
+                        except ValueError:
+                            LOG.warning(f'Validation failed for user option "{key}" from file, using default value')
+                            continue
                     break
 
     def init(self, *args, **kwargs):
         if len(args) < self._positional_count:
             raise RuntimeError(f'Argument mismatch (wants {self._positional_count})')
 
-        options = self._loaded_options
+        options = {}
 
         known_keys = [o.key for o in self._options]
         for key, value in kwargs.items():
@@ -382,7 +384,7 @@ class PluggramMeta:
             for option in self._options:
                 if option.key == unset_key:
                     if unset_key not in options.keys():
-                        options.update({unset_key: option.default})
+                        options.update({unset_key: option.value})
                         break
 
         self._instance = self._entry_class(*args, **options)

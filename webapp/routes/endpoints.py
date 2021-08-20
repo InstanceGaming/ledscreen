@@ -97,7 +97,7 @@ class PluggramOptions(Resource):
             values = {}
             keys = [o.key for o in meta.options]
 
-            for key, value in request.args.items():
+            for key, value in request.values.items():
                 key = key.lower()
 
                 if key in keys:
@@ -115,7 +115,10 @@ class PluggramOptions(Resource):
                 saved_keys = meta.save_options(values)
 
             did_save = len(saved_keys) > 0 and len(values.keys()) > 0
-            return {'query_name': query_name, 'invalid_keys': invalid_keys, 'saved': did_save}, 200
+            return {'query_name': query_name,
+                    'display_name': meta.display_name,
+                    'invalid_keys': invalid_keys,
+                    'saved': did_save}, 200
 
 
 api.add_resource(PluggramOptions, '/pluggram/<query_name>/options')
@@ -148,7 +151,8 @@ class Pluggrams(Resource):
                     'min': opt.min,
                     'max': opt.max,
                     'choices': opt.choices,
-                    'default_value': opt.default
+                    'default_value': opt.default,
+                    'value': opt.value
                 }
                 options_node.append(option_node)
 
