@@ -224,7 +224,7 @@
                                             <div class="btn-group float-end" role="group"
                                                  aria-label="Program row actions">
                                                 {% if program.options|length > 0 %}
-                                                <button type="button" class="btn btn-outline-secondary"
+                                                <button type="button" class="btn btn-outline-primary"
                                                         data-bs-toggle="modal"
                                                         data-bs-target="#settings-modal-{{ program.name }}"
                                                         title="Program settings">
@@ -232,11 +232,11 @@
                                                        aria-label="Program settings"></i>
                                                 </button>
                                                 {% endif %}
-                                                <button type="button" class="btn btn-success"
-                                                        id="btn-start-{{ program.name }}"
-                                                        title="Start">
-                                                    <i class="bi-play-fill" role="img"
-                                                       aria-label="Start program"></i>
+                                                <button type="button" class="btn btn-warning program-start-stop"
+                                                        data-program-name="{{ program.name }}"
+                                                        title="Start/Stop program">
+                                                    <i class="bi-slash-circle-fill" role="img"
+                                                       aria-label="Start/Stop program"></i>
                                                 </button>
                                             </div>
                                         </td>

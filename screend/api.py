@@ -1,13 +1,11 @@
 import logging
 import os
 import pathlib
-from functools import lru_cache
-from typing import Tuple
-from PIL import Image, ImageFont, ImageDraw
-
 import utils
-
-LOG = logging.getLogger('ledscreen.api')
+from io import BytesIO
+from typing import Tuple, Optional, List
+from PIL import Image, ImageFont, ImageDraw
+from tinyrpc.dispatch import public
 
 try:
     import rpi_ws281x
@@ -18,55 +16,49 @@ except ModuleNotFoundError:
 
     _LED_STRIP_CLASS = DummyStrip
 
-MAX_BRIGHTNESS = 190
-
 
 class Screen:
-    COLOR_MODE = 'RGB'
 
-    @property
+    # property
+    @public
     def width(self):
-        """
-        Horizontal pixel count.
-        """
         return self._w
 
-    @property
+    # property
+    @public
     def height(self):
-        """
-        Vertical pixel count.
-        """
         return self._h
 
-    @property
+    # property
+    @public
     def pixel_count(self):
-        """
-        Get the screen area in pixels.
-        """
         return self._w * self._h
-    
-    @property
-    def current_font(self):
-        return self._current_font
-    
-    @property
-    def fonts_dir(self):
-        return self._fonts_dir
 
-    @property
+    # property
+    @public
     def center(self):
         return int(round(self._w / 2)), int(round(self._h / 2))
 
-    @property
+    # property
     def antialiasing(self):
         return self._painter.fontmode == 'L'
 
-    @antialiasing.setter
-    def antialiasing(self, v):
+    # antialiasing setter
+    def set_antialiasing(self, v):
         if v:
             self._painter.fontmode = 'L'
         else:
             self._painter.fontmode = '1'
+
+    # property
+    @public
+    def current_font(self) -> Tuple[str, str]:
+        return self._current_font.getname()
+
+    # property
+    @public
+    def max_brightness(self) -> int:
+        return self._max_brightness
 
     def __init__(self,
                  w: int,
@@ -74,31 +66,37 @@ class Screen:
                  output_pin: int,
                  frequency: int,
                  dma_channel: int,
-                 brightness: int,
+                 max_brightness: int,
                  invert_signal: bool,
                  gpio_channel: int,
                  fonts_dir: str,
-                 antialiasing=False):
+                 antialiasing=False,
+                 frames_dir=None):
         super().__init__()
+        self.LOG = logging.getLogger('screend.screen')
+        utils.configure_logger(self.LOG)
 
         self._logger = logging.getLogger()
         self._w = w
         self._h = h
+        self._frame_count = 1
+        self._frames_dir = frames_dir
         self._output_pin = output_pin
         self._fonts_dir = os.path.abspath(fonts_dir)
         self._cached_fonts = {'default': ImageFont.load_default()}
         self._current_font = self._cached_fonts['default']
-        self._canvas = self._create_canvas(self.COLOR_MODE, 0)
+        self._canvas = self._create_canvas('RGB', 0)
         self._painter = ImageDraw.Draw(self._canvas)
         self.antialiasing = antialiasing
+        self._max_brightness = max_brightness
         self._matrix = _LED_STRIP_CLASS(self.pixel_count,
                                         self._output_pin,
                                         frequency,
                                         dma_channel,
                                         invert_signal,
-                                        brightness,
+                                        max_brightness,
                                         gpio_channel)
-        self.set_brightness(brightness)
+        self.set_brightness(max_brightness)
         self._matrix.begin()
         self.clear()
 
@@ -113,33 +111,45 @@ class Screen:
     def _create_canvas(self, mode: str, color_data):
         return Image.new(mode, (self._w, self._h), color_data)
 
-    def swap_frame(self, img: Image, update_painter=False):
-        self._canvas.paste(img)
+    @public
+    def paste(self, data: bytes, box: Optional[Tuple[int, int, int, int]], update_painter: bool):
+        img = Image.open(BytesIO(data))
+        self._canvas.paste(img, box=box)
 
         if update_painter:
             self._setup_painter()
 
+    @public
     def render(self):
         for i, (r, g, b) in enumerate(self._canvas.getdata()):
             self._matrix.setPixelColor(i, utils.combine_rgb(r, g, b))
 
         self._matrix.show()
 
-    def set_pixel(self, xy: int, color: int):
-        self._painter.point(xy, fill=color)
+        if self._frames_dir is not None:
+            path = os.path.join(self._frames_dir, f'{self._frame_count}.png')
+            self.write_file(path)
 
+        self._frame_count += 1
+
+    @public
+    def set_pixel(self, x: int, y: int, color: int):
+        self._painter.point((x, y), fill=color)
+
+    @public
     def set_brightness(self, v: int):
         if v > 255 or v < 0:
             raise ValueError('Brightness must be within range 0-255')
 
-        if v > MAX_BRIGHTNESS:
+        if v > self._max_brightness:
             raise RuntimeError('Too much current would be drawn with given global brightness amount, '
                                'crashed to prevent blowing all the supply fuses')
 
         self._matrix.setBrightness(v)
-        LOG.debug('screen brightness changed ({})'.format(v))
+        self.LOG.info('screen brightness changed ({})'.format(v))
 
-    def set_font(self, name: str, size=None, font_face=None) -> bool:
+    @public
+    def set_font(self, name: str, size: Optional[int], font_face: Optional[int]) -> bool:
         name = name.lower().strip()
         unique_name = name
 
@@ -169,32 +179,28 @@ class Screen:
 
                 if ext == '.ttf':
                     self._current_font = ImageFont.truetype(font_path, size, font_face or 0)
-                    LOG.info(f'loaded TrueType font "{name}"')
+                    self.LOG.info(f'loaded TrueType font "{name}"')
                 else:
                     self._current_font = ImageFont.load(font_path)
-                    LOG.info(f'loaded font "{name}"')
+                    self.LOG.info(f'loaded font "{name}"')
 
                 self._cached_fonts.update({unique_name: self._current_font})
                 return True
             except OSError:
-                LOG.debug(f'failed to load font "{name}" from "{self._fonts_dir}"')
+                self.LOG.debug(f'failed to load font "{name}" from "{self._fonts_dir}"')
 
         return False
 
-    @lru_cache(100)
+    @public
+    def font_names(self) -> list:
+        return [n.lower() for n in os.listdir(self._fonts_dir)]
+
+    @public
     def text_dimensions(self,
                         message: str,
-                        spacing=None,
-                        features=None,
-                        stroke_width=None) -> Tuple:
-        """
-        Get the x, y size of text with a given message.
-        :param message: character sequence to consider
-        :param stroke_width: outline width
-        :param features: font engine arguments
-        :param spacing: distance between lines of text
-        :return: width, height
-        """
+                        spacing: Optional[int],
+                        features: Optional[List[str]],
+                        stroke_width: Optional[int]) -> Tuple:
         a, b = self._painter.multiline_textsize(message,
                                                 self._current_font,
                                                 spacing=spacing or 4,
@@ -202,7 +208,8 @@ class Screen:
                                                 stroke_width=stroke_width or 0)
         return a, b
 
-    def index_of(self, x: int, y: int):
+    @public
+    def index_of(self, x: int, y: int) -> int:
         if x < 0 or y < 0:
             raise ValueError('Coordinates cannot be negative')
 
@@ -211,32 +218,18 @@ class Screen:
 
         return x + y * self._w
 
+    @public
     def draw_text(self,
-                  xy,
+                  x: int,
+                  y: int,
                   color: int,
                   message: str,
-                  anchor=None,
-                  spacing=None,
-                  alignment=None,
-                  stroke_width=None,
-                  stroke_fill=None):
-        """
-        Draw text into the current frame to be rendered.
-        See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html#text-anchors for more details on anchoring.
-
-        :param xy: x, y screen coordinates
-        :param color: foreground color (what the text will be filled with)
-        :param message: characters to draw from the current font
-        :param anchor: anchoring position (graph origin) of the text, "lt" or "la" (default)
-        :param spacing: number of pixels between lines
-        :param alignment: relative alignment of characters, "left", "center", "right"
-        :param stroke_width: number of pixels that form a outline around each character
-        :param stroke_fill: color of outline around each character
-        """
-        assert isinstance(xy, tuple)
-        a = xy[0]
-        b = xy[1]
-        self._painter.text((a, b),
+                  anchor: Optional[str],
+                  spacing: Optional[int],
+                  alignment: Optional[str],
+                  stroke_width: Optional[int],
+                  stroke_fill: Optional[int]):
+        self._painter.text((x, y),
                            message,
                            fill=color,
                            font=self._current_font,
@@ -246,36 +239,43 @@ class Screen:
                            stroke_width=stroke_width or 0,
                            stroke_fill=stroke_fill)
 
-    def fill(self, color: int, box=None):
-        """
-        Paint all or a portion of the screen with a color.
-
-        :param color: RGB color to fill with.
-        :param box: space to fill (leave None for the whole screen) of structure (x1, y1, x2, y2)
-        """
+    @public
+    def fill(self, color: int, box: Optional[Tuple[int, int, int, int]]):
         if box is not None:
             if not isinstance(box, tuple):
-                raise TypeError('box must be a tuple of structure (x1, y1, x2, y2)')
+                raise ValueError('box must be a tuple of structure (x1, y1, x2, y2)')
 
             if len(box) != 4:
-                raise TypeError('box must be a tuple of structure (x1, y1, x2, y2)')
+                raise ValueError('box must be a tuple of structure (x1, y1, x2, y2)')
 
         self._painter.rectangle(box or (0, 0, self._w, self._h), fill=color)
 
-    def draw_elipse(self, xy, width=None, color=None, outline=None):
-        self._painter.ellipse(xy, fill=color, outline=outline, width=width)
+    @public
+    def draw_ellipse(self,
+                     x: int,
+                     y: int,
+                     width: Optional[int],
+                     color: Optional[int],
+                     outline: Optional[int]):
+        self._painter.ellipse((x, y), fill=color, outline=outline, width=width)
 
-    def draw_line(self, xy, color=None, width=None, rounded=False):
-        self._painter.line(xy, fill=color, width=width, joint='curve' if rounded else None)
+    @public
+    def draw_line(self,
+                  x: int,
+                  y: int,
+                  color: Optional[int],
+                  width: Optional[int],
+                  rounded: bool):
+        self._painter.line((x, y), fill=color, width=width, joint='curve' if rounded else None)
 
-    def draw_bitmap(self, xy, bitmap, color=None):
-        self._painter.bitmap(xy, bitmap, fill=color)
-
+    @public
     def clear(self):
-        self.fill(0)
+        self.fill(0, None)
 
+    @public
     def write_file(self, filename: str):
         self._canvas.save(filename)
 
+    @public
     def get_data(self):
         self._canvas.getdata()

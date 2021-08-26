@@ -1,7 +1,6 @@
 from datetime import datetime as dt
-
-from api import Screen, MAX_BRIGHTNESS
 from pluggram import Pluggram, Option
+from rpc import Screen
 
 
 class WallClock(Pluggram):
@@ -10,7 +9,7 @@ class WallClock(Pluggram):
     VERSION = '1.0.0'
     TICK_RATE = '500ms'
     OPTIONS = [
-        Option('brightness', 128, min=1, max=MAX_BRIGHTNESS),
+        Option('brightness', 128, min=1, max=190),
         Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True, help='Color of all rendered text.'),
         Option('background', 0, min=0, max=0xFFFFFF, color_picker=True, help='Color behind text.'),
         Option('stroke_thickness', 0, min=0, max=10, help='Number of pixels to outline around time text.'),
@@ -60,7 +59,8 @@ class WallClock(Pluggram):
         if self._show_date:
             # date
             self._screen.set_font(self.FONT_REG, size=self.SMALL_FONT)
-            self._screen.draw_text((center[0], 0),
+            self._screen.draw_text(center[0],
+                                   0,
                                    self._foreground,
                                    date_text,
                                    anchor='ma',
@@ -70,7 +70,8 @@ class WallClock(Pluggram):
 
         # time
         time_pos = (center[0], self._screen.height - 2) if self._show_date else center
-        self._screen.draw_text(time_pos,
+        self._screen.draw_text(time_pos[0],
+                               time_pos[1],
                                self._foreground,
                                time_text,
                                anchor='mb' if self._show_date else 'mm',

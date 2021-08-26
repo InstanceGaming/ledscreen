@@ -1,11 +1,8 @@
 import logging
-import os
-from typing import Optional
-
 from flask import Blueprint, request
-from flask_restful import Api, Resource, abort
+from flask_restful import Api, Resource
 import system
-import pluggram
+from common import config, screen, pluggram_manager
 
 
 LOG = logging.getLogger('ledscreen.web.api')
@@ -20,12 +17,23 @@ def key_or_session():
         api_key = request.args.get('key', None)
 
         if api_key is not None:
-            if api_key not in system.config['app.api_keys']:
+            if api_key not in config['app.api_keys']:
                 LOG.debug(f'API key "{api_key}" not found, checking for cookie instead')
             else:
                 LOG.info(f'API key "{api_key}" was used for "{request.path}"')
                 return True
         return False
+
+
+def get_query_pluggram_name(query_name: str):
+    selected_name = None
+
+    for pg in pluggram_manager.get_names():
+        if pg == query_name.lower().strip():
+            selected_name = pg
+            break
+
+    return selected_name
 
 
 class RunPluggram(Resource):
@@ -34,17 +42,12 @@ class RunPluggram(Resource):
         if not key_or_session():
             return {}, 403
 
-        meta = None
+        selected_name = get_query_pluggram_name(query_name)
 
-        for pg in system.loaded_pluggrams:
-            if pg.name == query_name.lower().strip():
-                meta = pg
-                break
-
-        if meta is None:
+        if selected_name is None:
             return {'query_name': query_name}, 404
         else:
-            pluggram.runner.start(meta, system.screen)
+            pluggram_manager.start(selected_name)
             return {'query_name': query_name}, 200
 
 
@@ -64,15 +67,15 @@ class StopPluggram(Resource):
         except ValueError:
             return {'message': 'cannot parse "clear" argument'}, 400
 
-        if pluggram.runner.running:
-            meta = pluggram.runner.meta
-            pluggram.runner.stop()
+        running_name = pluggram_manager.get_running()
+
+        if running_name:
+            pluggram_manager.stop()
 
             if clear:
-                system.screen.clear()
+                screen.clear()
 
-            return {'name': meta.name}, 200
-        return {'name': None}, 200
+        return {'name': running_name}, 200
 
 
 api.add_resource(StopPluggram, '/pluggrams/stop')
@@ -84,18 +87,14 @@ class PluggramOptions(Resource):
         if not key_or_session():
             return {}, 403
 
-        meta: Optional[pluggram.PluggramMeta] = None
+        selected_name = get_query_pluggram_name(query_name)
 
-        for pg in system.loaded_pluggrams:
-            if pg.name == query_name.lower().strip():
-                meta = pg
-                break
-
-        if meta is None:
+        if selected_name is None:
             return {'query_name': query_name}, 404
         else:
             values = {}
-            keys = [o.key for o in meta.options]
+            options = pluggram_manager.get_options(selected_name)
+            keys = [o.name for o in options]
 
             for key, value in request.values.items():
                 key = key.lower()
@@ -108,17 +107,13 @@ class PluggramOptions(Resource):
 
                     values.update({key: value})
 
-            invalid_keys = meta.validate_options(values)
-            saved_keys = []
+            invalid_keys, saved = pluggram_manager.save_options(selected_name, values)
+            display_name = pluggram_manager.get_info(selected_name).display_name
 
-            if len(invalid_keys) < 1:
-                saved_keys = meta.save_options(values)
-
-            did_save = len(saved_keys) > 0 and len(values.keys()) > 0
             return {'query_name': query_name,
-                    'display_name': meta.display_name,
+                    'display_name': display_name,
                     'invalid_keys': invalid_keys,
-                    'saved': did_save}, 200
+                    'saved': saved}, 200
 
 
 api.add_resource(PluggramOptions, '/pluggram/<query_name>/options')
@@ -127,10 +122,8 @@ api.add_resource(PluggramOptions, '/pluggram/<query_name>/options')
 class RunningPluggram(Resource):
 
     def get(self):
-        if pluggram.runner.running:
-            meta = pluggram.runner.meta
-            return {'name': meta.name, 'display_name': meta.display_name}, 200
-        return {'name': None, 'display_name': None}, 200
+        running_name = pluggram_manager.get_running()
+        return {'name': running_name}, 200
 
 
 api.add_resource(RunningPluggram, '/pluggrams/running')
@@ -141,12 +134,13 @@ class Pluggrams(Resource):
     def get(self):
         payload = []
 
-        for pg in system.loaded_pluggrams:
+        for name in pluggram_manager.get_names():
+            options = pluggram_manager.get_options(name)
             options_node = []
 
-            for opt in pg.options:
+            for opt in options:
                 option_node = {
-                    'name': opt.key,
+                    'name': opt.name,
                     'type': opt.type_name,
                     'min': opt.min,
                     'max': opt.max,
@@ -156,11 +150,12 @@ class Pluggrams(Resource):
                 }
                 options_node.append(option_node)
 
+            info = pluggram_manager.get_info(name)
             pluggram_node = {
-                'name': pg.name,
-                'display_name': pg.display_name,
-                'version': pg.version,
-                'description': pg.description,
+                'name': name,
+                'display_name': info.display_name,
+                'version': info.version,
+                'description': info.description,
                 'options': options_node
             }
             payload.append(pluggram_node)
@@ -174,14 +169,8 @@ api.add_resource(Pluggrams, '/pluggrams')
 class Fonts(Resource):
 
     def get(self):
-        font_dir = system.config['screen.fonts_dir']
-        abs_path = os.path.abspath(font_dir)
-
-        if os.path.isdir(abs_path):
-            files = os.listdir(abs_path)
-            return files, 200
-        else:
-            return [], 404
+        names = screen.font_names()
+        return names, 200
 
 
 api.add_resource(Fonts, '/fonts')

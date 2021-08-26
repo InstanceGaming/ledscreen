@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta
-
 import utils
-from api import Screen, MAX_BRIGHTNESS
 from pluggram import Pluggram, Option
+from rpc import Screen
 
 
 class BackSoon(Pluggram):
@@ -11,7 +10,7 @@ class BackSoon(Pluggram):
     VERSION = '1.0.0'
     TICK_RATE = '500ms'
     OPTIONS = [
-        Option('brightness', 128, min=1, max=MAX_BRIGHTNESS),
+        Option('brightness', 128, min=1, max=190),
         Option('minutes', 5, min=1),
         Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True),
         Option('background', 0, min=0, max=0xFFFFFF, color_picker=True)

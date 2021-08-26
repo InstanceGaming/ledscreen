@@ -1,7 +1,6 @@
 import logging
+from common import config
 from flask import Blueprint, render_template
-
-import system
 from .authentication import auth_or_login
 
 
@@ -12,6 +11,6 @@ bp = Blueprint('manage', __name__, url_prefix='/manage')
 @bp.route('/', methods=['GET'])
 def index():
     auth_or_login()
-    name = system.config['user.name']
-    programs = system.loaded_pluggrams
+    name = config['user.name']
+    programs = []
     return render_template('pages/manage.html', programs=programs, username=name)

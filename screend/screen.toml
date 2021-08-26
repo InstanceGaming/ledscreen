@@ -1,0 +1,11 @@
+width = 54
+height = 36
+max_brightness = 190
+frequency = 800000
+dma_channel = 10
+gpio_pin = 18
+gpio_channel = 0
+inverted = false
+antialiasing = false
+fonts_dir = "fonts"
+frames_dir = "frames"

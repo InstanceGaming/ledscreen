@@ -1,41 +1,54 @@
-import eventlet
-eventlet.monkey_patch()
-
 import signal
 import flask
 import logging
-import pluggram
-import wsio
-import system
+import rpc
 import netutils
-from utils import load_config, configure_logger
+import zmq
+import common
+from tinyrpc import RPCClient
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
+from tinyrpc.transports.zmq import ZmqClientTransport
+from utils import load_config, configure_logger, validate_config, get_config_path
 from flask_minify import minify
 
-
+VERSION = '1.0.0'
 LOG = logging.getLogger('ledscreen')
 configure_logger(LOG)
 
 
 def create_app():
-    config = load_config()
+    config_path = get_config_path()
+    conf = load_config(config_path)
+    validate_config(config_path, conf)
     LOG.info(f'loaded application config')
-    system.init(config)
 
-    programs = pluggram.load(config['app.programs_dir'], 1)
-    LOG.info(f'loaded {len(programs)} pluggrams')
+    context = zmq.Context()
+    screen_client = RPCClient(
+        MSGPACKRPCProtocol(),
+        ZmqClientTransport.create(context, conf['app.screen_url'])
+    )
+    screen_proxy = screen_client.get_proxy()
+    scr = rpc.Screen(screen_proxy)
 
-    for program in programs:
-        if program.has_user_options:
-            program.load_options()
+    LOG.info(f'started screen RPC client')
 
-    LOG.info(f'loaded pluggram user settings')
-    system.loaded_pluggrams.extend(programs)
+    pluggram_client = RPCClient(
+        MSGPACKRPCProtocol(),
+        ZmqClientTransport.create(context, conf['app.pluggram_url'])
+    )
+    pluggram_proxy = pluggram_client.get_proxy()
+    plugman = rpc.PluggramManager(pluggram_proxy)
+
+    LOG.info(f'started pluggram RPC client')
 
     app = flask.Flask(__name__)
     app.url_map.strict_slashes = False
-    app.secret_key = config['app.secret']
-
+    app.secret_key = conf['app.secret']
     LOG.debug('initialized flask')
+
+    common.config = conf
+    common.screen = scr
+    common.pluggram_manager = plugman
 
     from routes import authentication, management, endpoints
 
@@ -44,50 +57,52 @@ def create_app():
     app.register_blueprint(endpoints.bp)
     LOG.debug('registered blueprints')
 
-    if config['app.minification']:
+    if conf['app.minification']:
         LOG.debug('minification enabled')
         minify(app)
 
-    socketio = wsio.init_flask(app)
-    LOG.debug('initialized socket io')
-
     ip_addr = None
     try:
-        ip_addr = netutils.get_ip_address(config['server.iface'])
+        ip_addr = netutils.get_ip_address(conf['server.iface'])
     except Exception as e:
         LOG.warning(f'failed to get IPv4 address: {str(e)}')
 
-    system.screen.set_font('slkscr.ttf', 9)
-    system.screen.draw_text((0, 0),
-                            color=0xFFFFFF,
-                            message=f'V{system.VERSION}',
-                            anchor='lt',
-                            alignment='left')
-    system.screen.draw_text((system.screen.width, 0),
-                            color=0xFFFFFF,
-                            message='JLJ',
-                            anchor='rt',
-                            alignment='right')
+    scr.set_font('slkscr.ttf', 9)
+    scr.draw_text(0,
+                  0,
+                  0xFFFFFF,
+                  f'V{VERSION}',
+                  anchor='lt',
+                  alignment='left')
+    scr.draw_text(scr.width,
+                  0,
+                  0xFFFFFF,
+                  'JLJ',
+                  anchor='rt',
+                  alignment='right')
     if ip_addr is not None:
         parts = ip_addr.split('.')
 
         for i, part in enumerate(parts, start=1):
-            system.screen.draw_text((0, 6 * i),
-                                    color=0x00FFFF,
-                                    message=(part if i == len(parts) else f'{part}.'),
-                                    anchor='lt',
-                                    alignment='left')
+            scr.draw_text(0,
+                          6 * i,
+                          0x00FFFF,
+                          (part if i == len(parts) else f'{part}.'),
+                          anchor='lt',
+                          alignment='left')
     else:
-        system.screen.draw_text((0, 6),
-                                color=0x0000FF,
-                                message='IFP FAIL',
-                                anchor='lt',
-                                alignment='left')
+        scr.draw_text(0,
+                      6,
+                      0x0000FF,
+                      'BAD IFN',
+                      'lt',
+                      'left')
+    scr.render()
 
-    return socketio, app, config
+    return app
 
 
-sio, application, configuration = create_app()
+application = create_app()
 
 
 def _signal_interrupt(_a, _b):
@@ -96,7 +111,7 @@ def _signal_interrupt(_a, _b):
 
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, _signal_interrupt)
-    host = configuration['server.host']
-    port = configuration['server.port']
+    host = common.config['server.host']
+    port = common.config['server.port']
     LOG.info(f'starting web server {host}:{port}')
-    sio.run(application, host=host, port=port)
+    application.run(host=host, port=port)

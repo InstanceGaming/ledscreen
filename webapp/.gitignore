@@ -4,9 +4,5 @@ environments/**
 storage/**
 run/**
 archived/**
-fonts/**
-config.toml
-**/*.png
-**/*.jpg
-**/*.jpeg
-**/options.json
+*.toml
+programs/**/options.json

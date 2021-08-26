@@ -1,11 +1,16 @@
 import json
 import os
+
+import zmq
+from tinyrpc import RPCClient
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
+from tinyrpc.transports.zmq import ZmqClientTransport
+
+import api
 from utils import timing_counter
-from api import Screen
 from pluggram import load
 import traceback
 import argparse
-import system
 
 
 def get_cla():
@@ -27,47 +32,51 @@ def get_cla():
                     metavar='DIRECTORY',
                     dest='programs_dir',
                     default='programs',
-                    help='Location of pluggram modules.')
+                    help='Location of pluggram modules. Default is "programs"')
     ap.add_argument(type=str,
                     metavar='MODULE_NAME',
                     dest='module_name',
                     help='Name of a pluggram module to load within the configured programs directory.')
+    ap.add_argument(type=str,
+                    metavar='URL',
+                    dest='rpc_url',
+                    help='RPC screen server URL.')
     return ap.parse_args()
 
 
 if __name__ == '__main__':
-    screen = Screen(54,
-                    36,
-                    18,
-                    800000,
-                    10,
-                    128,
-                    False,
-                    0,
-                    'fonts')
-
     cla = get_cla()
 
     module_name = cla.module_name
+    rpc_url = cla.rpc_url
     frames_dir = cla.frames_dir if cla.frames_dir is not None else None
     end_frame = cla.end_frame
+
+    context = zmq.Context()
+    client = RPCClient(
+        MSGPACKRPCProtocol(),
+        ZmqClientTransport.create(context, rpc_url)
+    )
+
+    proxy_obj = client.get_proxy()
+    screen = api.Screen(proxy_obj)
 
     if frames_dir is not None:
         if not os.path.isdir(frames_dir):
             print('Frame output path does not exist or is not a directory')
             exit(2)
 
-    system.screen = screen
+    metas, klass_objects = load('programs', 1)
+    print(f'loaded {len(metas)} pluggrams')
 
-    loaded_pluggrams = load('programs', 1)
-    print(f'loaded {len(loaded_pluggrams)} pluggrams')
-
-    if len(loaded_pluggrams) > 0:
+    if len(metas) > 0:
         pgm = None
+        pgc = None
         selection_name = module_name.lower().strip()
-        for pg in loaded_pluggrams:
+        for pg, pc in zip(metas, klass_objects):
             if pg.name == selection_name:
                 pgm = pg
+                pgc = pc
                 break
         else:
             print(f'"{selection_name}" not found or was disqualified')
@@ -87,7 +96,7 @@ if __name__ == '__main__':
             print(f'loaded user preferences')
 
         try:
-            pgm.init(screen)
+            instance = pgm.init(pgc, screen)
         except Exception as e:
             print(f'exception {e.__class__.__name__} initializing pluggram "{pgm.name}" ({pgm.class_name}): {str(e)}')
             print(traceback.format_exc())
@@ -102,7 +111,7 @@ if __name__ == '__main__':
                 if (rate is not None and timing_counter() - marker > rate) or rate is None:
                     marker = timing_counter()
                     try:
-                        pgm.tick()
+                        instance.tick()
                     except Exception as e:
                         print(f'exception {e.__class__.__name__} updating pluggram "{pgm.name}": {str(e)}')
                         print(traceback.format_exc())

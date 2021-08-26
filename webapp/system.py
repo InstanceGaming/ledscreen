@@ -4,21 +4,16 @@ import os
 import re
 import subprocess
 import utils
+from common import config, screen
 from flask import request
 from datetime import datetime, timedelta
 from typing import Optional
-from api import Screen
 
 
-VERSION = '1.0.0'
 LOG = logging.getLogger('ledscreen.system')
 USERNAME_PATTERN = re.compile('[^A-Za-z- ]+')
 AUTH_COOKIE_NAME = 'ledscreen'
 SESSION_TOKEN_LENGTH = 32
-
-config = {}
-loaded_pluggrams = []
-screen: Optional[Screen] = None
 
 
 class UserState:
@@ -44,8 +39,8 @@ class UserState:
         self.last_activity = datetime.utcnow()
 
     def logout(self):
-        self.session_token = None
         LOG.info(f'unauthenticated user from session {user_state.session_token}')
+        self.session_token = None
 
     def validate_session(self, b: str):
         if self.session_token and b:
@@ -130,19 +125,3 @@ def restart():
         proc.wait()
     else:
         raise NotImplementedError('Intentionally left unimplemented; this system is only used on Linux')
-
-
-def init(conf):
-    global config, screen
-    config = conf
-    screen = Screen(
-        config['screen.width'],
-        config['screen.height'],
-        config['screen.gpio_pin'],
-        config['screen.frequency'],
-        config['screen.dma_channel'],
-        config['screen.brightness'],
-        config['screen.inverted'],
-        config['screen.gpio_channel'],
-        config['screen.fonts_dir']
-    )

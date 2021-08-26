@@ -1,7 +1,7 @@
 import os
 from PIL import Image
-from api import Screen, MAX_BRIGHTNESS
 from pluggram import Pluggram, Option
+from rpc import Screen
 
 
 class Rickroll(Pluggram):
@@ -10,7 +10,7 @@ class Rickroll(Pluggram):
     VERSION = '1.0.0'
     TICK_RATE = None
     OPTIONS = [
-        Option('brightness', 128, min=1, max=MAX_BRIGHTNESS)
+        Option('brightness', 128, min=1, max=190)
     ]
     FILE_PATH = 'static/images/rick.gif'
 
@@ -31,7 +31,7 @@ class Rickroll(Pluggram):
 
     def tick(self):
         self._gif.seek(self._frame_index)
-        self._screen.swap_frame(self._gif)
+        self._screen.paste(self._gif)
 
         # update the screen
         self._screen.render()

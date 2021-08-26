@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
-from api import Screen, MAX_BRIGHTNESS
 from pluggram import Pluggram, Option
+from rpc import Screen
 
 
 def better_timedelta_format(td):
@@ -22,7 +22,7 @@ class Timer(Pluggram):
     VERSION = '1.0.0'
     TICK_RATE = '100ms'
     OPTIONS = [
-        Option('brightness', 128, min=1, max=MAX_BRIGHTNESS),
+        Option('brightness', 128, min=1, max=190),
         Option('minutes', 5, min=0.125, help='How many minutes the timer will last.'),
         Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True, help='Color of all rendered text.'),
         Option('background', 0, min=0, max=0xFFFFFF, color_picker=True, help='Color behind text.'),
@@ -62,7 +62,8 @@ class Timer(Pluggram):
         self._screen.fill(self._background)
 
         center = self._screen.center
-        self._screen.draw_text(center,
+        self._screen.draw_text(center[0],
+                               center[1],
                                self._foreground,
                                message,
                                anchor='mm',

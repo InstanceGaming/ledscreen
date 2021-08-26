@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from flask import (Blueprint,
                    request,
                    render_template,
@@ -9,8 +7,6 @@ from flask import (Blueprint,
 import system
 import enum
 import logging
-
-import utils
 
 LOG = logging.getLogger('ledscreen.web.auth')
 bp = Blueprint('auth', __name__)

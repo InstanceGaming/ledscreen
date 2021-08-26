@@ -1,19 +1,8 @@
 import utils
-from api import Screen, MAX_BRIGHTNESS
 from pluggram import Pluggram, Option
+from rpc import Screen
 from utils import timing_counter
 import random
-import system
-import os
-
-
-def get_font_names():
-    font_dir = os.path.abspath(system.screen.fonts_dir)
-
-    if os.path.isdir(font_dir):
-        return os.listdir(font_dir)
-
-    return None
 
 
 class ScrollingText(Pluggram):
@@ -22,9 +11,9 @@ class ScrollingText(Pluggram):
     VERSION = '1.0.0'
     TICK_RATE = '20ms'
     OPTIONS = [
-        Option('brightness', 128, min=1, max=MAX_BRIGHTNESS),
+        Option('brightness', 128, min=1, max=190),
         Option('message', 'Computer science rocks!', min=1),
-        Option('font', 'slkscr.ttf', choices=get_font_names(), min=5,
+        Option('font', 'slkscr.ttf', min=5,
                help='What TrueType font face to load from file. (.ttf)'),
         Option('start_delay', 1000, min=0, help='Wait this many milliseconds before scrolling.'),
         Option('font_size', 17, min=6, max=60),

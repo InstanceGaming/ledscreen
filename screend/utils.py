@@ -1,13 +1,10 @@
 import time
-import random
 import os
 import pytoml
 import logging
-from dotted.collection import DottedDict, DottedList
-
+from dotted.collection import DottedDict
 
 LOG = logging.getLogger('ledscreen.utils')
-MAX_COLORS = 16777215
 DEV_FORMATTER = logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
                                   datefmt='%x %H:%M:%S',
                                   style='{')
@@ -27,14 +24,6 @@ def configure_logger(log, prod_level=logging.INFO):
 
     log.handlers.clear()
     log.addHandler(handler)
-
-
-def get_key_display_name(key: str):
-    return key.replace('_', ' ').capitalize()
-
-
-def get_config_path():
-    return os.environ.get('APP_CONFIG')
 
 
 class ConfigValidator:
@@ -67,7 +56,11 @@ class ConfigValidator:
         abs_key = self.getAbsoluteKey(relative_key)
         return self._data.get(abs_key)
 
-    def validate(self, relative_key: str, required_type=None):
+    def validate(self,
+                 relative_key: str,
+                 required_type=None,
+                 optional=False,
+                 isdir=False):
         abs_key = self.getAbsoluteKey(relative_key)
 
         if abs_key in self._data:
@@ -77,12 +70,17 @@ class ConfigValidator:
                 if not isinstance(value, required_type):
                     LOG.error(f'"{abs_key}" must be of type {required_type.__name__}')
                     exit(3)
+                else:
+                    if isdir and not os.path.isdir(value):
+                        LOG.error(f'"{abs_key}" must be a directory')
+                        exit(3)
         else:
-            LOG.error(f'"{abs_key}" must be defined')
-            exit(3)
+            if not optional:
+                LOG.error(f'"{abs_key}" must be defined')
+                exit(3)
 
 
-def load_config(path):
+def load_config(path: str):
     config = None
 
     if os.path.isfile(path):
@@ -104,24 +102,17 @@ def load_config(path):
 
 def validate_config(path: str, config: DottedDict):
     root = ConfigValidator(path, config)
-
-    server = root.addValidator('server')
-    server.validate('host', str)
-    server.validate('port', int)
-    server.validate('iface', str)
-
-    app = root.addValidator('app')
-    app.validate('secret', str)
-    app.validate('programs_dir', str)
-    app.validate('minification', bool)
-    app.validate('api_keys', DottedList)
-    app.validate('max_session_minutes', int)
-    app.validate('screen_url', str)
-    app.validate('pluggram_url', str)
-
-    user = root.addValidator('user')
-    user.validate('name', str)
-    user.validate('password', str)
+    root.validate('width', int)
+    root.validate('height', int)
+    root.validate('frequency', int)
+    root.validate('max_brightness', int)
+    root.validate('dma_channel', int)
+    root.validate('gpio_pin', int)
+    root.validate('gpio_channel', int)
+    root.validate('inverted', bool)
+    root.validate('antialiasing', bool)
+    root.validate('fonts_dir', str, isdir=True)
+    root.validate('frames_dir', str, optional=True, isdir=True)
 
 
 def pretty_ms(milliseconds):
@@ -154,23 +145,6 @@ def pretty_timedelta(td, prefix=None, format_spec=None):
         elif 86400 <= seconds:
             return prefix + format(seconds / 86400, format_spec) + ' days'
     return None
-
-
-def generate_sanitized_alphanumerics(length: int, lowercase=True, special=False):
-    char_set = 'BCDFGHJKLMNPQRSTVWXYZ0123456789'
-
-    if lowercase:
-        char_set += 'bcdfghjklmnpqrstvwxyz'
-
-    if special:
-        char_set += '_-'
-
-    result = ''
-
-    for i in range(length):
-        result += random.choice(char_set)
-
-    return result
 
 
 def combine_rgb(r: int, g: int, b: int):
