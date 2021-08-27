@@ -67,6 +67,7 @@ def create_app():
     except Exception as e:
         LOG.warning(f'failed to get IPv4 address: {str(e)}')
 
+    scr.clear()
     scr.set_font('slkscr.ttf', 9)
     scr.draw_text(0,
                   0,

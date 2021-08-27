@@ -1,15 +1,17 @@
 from typing import List, Tuple, Union, Optional
 from tinyrpc.dispatch import public
-from pluggram import PluggramMetadata
-from rpc import Screen, Option, PluggramInfo
+from pluggram import PluggramMetadata, PluggramRunner
 from functools import lru_cache
 
 
 class PluggramManager:
 
-    def __init__(self, metadata: List[PluggramMetadata], screen: Screen):
+    def __init__(self,
+                 metadata: List[PluggramMetadata],
+                 screen_url: str):
         self._metadata = metadata
-        self._screen = screen
+        self._screen_url = screen_url
+        self._runner = PluggramRunner()
 
     @lru_cache(maxsize=10)
     def _find_by_name(self, name: str) -> PluggramMetadata:
@@ -55,12 +57,15 @@ class PluggramManager:
 
     @public
     def get_running(self) -> Optional[str]:
+        if self._runner.is_running:
+            return self._runner.running.name
         return None
 
     @public
-    def start(self, name: str) -> bool:
-        return False
+    def start(self, name: str):
+        metadata = self._find_by_name(name)
+        self._runner.start(metadata, self._screen_url)
 
     @public
-    def stop(self):
-        pass
+    def stop(self) -> bool:
+        return self._runner.stop()

@@ -6,16 +6,20 @@ import traceback
 import traceback as tb
 import inspect
 import re
+import zmq
+import rpc
 from collections import KeysView
 from multiprocessing import Event, Process
 from inspect import Parameter
-from typing import Optional, List
-
+from typing import Optional, List, Tuple
+from tinyrpc import RPCClient
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
+from tinyrpc.transports.zmq import ZmqClientTransport
 from rpc import InputMethod
-from utils import timing_counter
+from utils import timing_counter, configure_logger
 
-
-LOG = logging.getLogger('ledscreen.pluggram')
+LOG = logging.getLogger('pluggramd')
+configure_logger(LOG)
 INTERVAL_PATTERN = re.compile(r'(\d+)(ms|s|m)')
 OPT_KEY_PATTERN = re.compile(r'(^a-z0-9_)')
 USER_OPTIONS_FILE = 'options.json'
@@ -102,11 +106,11 @@ class Option:
     @property
     def choices(self):
         return self._choices
-    
+
     @property
     def input_method(self):
         return self._input_method
-    
+
     @property
     def value(self):
         return self._value
@@ -266,7 +270,7 @@ class PluggramMetadata:
     @property
     def options(self) -> List[Option]:
         return self._options
-    
+
     @property
     def tick_rate(self):
         return self._tick_rate
@@ -278,10 +282,6 @@ class PluggramMetadata:
     @property
     def has_user_options(self):
         return os.path.exists(self._store_path)
-
-    @property
-    def initialized(self):
-        return self._initialized
 
     def __init__(self,
                  module_path: str,
@@ -303,7 +303,6 @@ class PluggramMetadata:
         self._positional_count = positional_count
         self._options = options or []
         self._store_path = os.path.join(self.module_path, USER_OPTIONS_FILE)
-        self._initialized = False
 
     def validate_options(self, options: dict) -> list:
         invalid_keys = []
@@ -350,33 +349,12 @@ class PluggramMetadata:
                             continue
                     break
 
-    def init(self, live_type: type, *args, **kwargs) -> type:
-        if len(args) < self._positional_count:
-            raise RuntimeError(f'Argument mismatch (wants {self._positional_count})')
-
-        options = {}
-
-        known_keys = [o.key for o in self._options]
-        for key, value in kwargs.items():
-            if key in known_keys:
-                known_keys.remove(key)
-                for option in self._options:
-                    if option.key == key:
-                        if option.validate(value):
-                            options.update({key: value})
-                        else:
-                            raise ValueError(f'Option "{key}" has invalid value')
-                        break
-
-        for unset_key in known_keys:
-            for option in self._options:
-                if option.key == unset_key:
-                    if unset_key not in options.keys():
-                        options.update({unset_key: option.value})
-                        break
-
-        self._initialized = True
-        return live_type(*args, **options)
+    def get_filled_options(self):
+        filled = {}
+        for opt in self._options:
+            key = opt.key
+            filled.update({key: opt.value})
+        return filled
 
 
 class Pluggram:
@@ -385,13 +363,17 @@ class Pluggram:
         raise NotImplementedError('tick() was never overridden')
 
 
-def load_one(module_path: str, module_name: str, argument_count: int):
-    meta = None
+def load_type(module_path: str) -> Tuple[str, type]:
+    """
+    Get the first class name and type in the specified Python module that inherits the Pluggram type.
+    Will raise TypeError if no suitable class type was found.
+    """
     module_class = None
+    module_name = os.path.basename(module_path)
     for file in os.listdir(module_path):
         if file == '__init__.py':
             init_path = os.path.join(module_path, file)
-            LOG.debug(f'found module {module_name} ("{module_path}")')
+            LOG.debug(f'load_type("{module_path}"): found module {module_name}')
 
             spec = importlib.util.spec_from_file_location(module_name, init_path)
             loaded_module = importlib.util.module_from_spec(spec)
@@ -399,39 +381,50 @@ def load_one(module_path: str, module_name: str, argument_count: int):
             try:
                 spec.loader.exec_module(loaded_module)
             except Exception as e:
-                message = f'disqualifying module {module_name}: exception raised in "{file}":\n'
+                message = f'load_type("{module_path}"): exception raised in "{file}":\n'
                 message += ''.join(tb.format_exception(None, e, e.__traceback__))
-                LOG.warning(message)
+                LOG.debug(message)
+                LOG.warning(f'{module_name} failed to load')
                 continue
 
             # 1. get class definitions in module to find entrypoint
             class_members = inspect.getmembers(loaded_module, inspect.isclass)
 
             # 2. find one class which inherits Pluggram or DQ
+            class_name = None
             for class_name, module_class in class_members:
                 bases = module_class.__bases__
 
                 if Pluggram in bases:
                     break
 
+            return class_name, module_class
+    raise TypeError()
+
+
+def load_one(module_path: str, argument_count: int) -> Optional[PluggramMetadata]:
+    meta = None
+    module_name = os.path.basename(module_path)
+    for file in os.listdir(module_path):
+        if file == '__init__.py':
+            class_name, module_class = load_type(module_path)
+
             if module_class is None:
-                LOG.warning(f'disqualifying module {module_name}: '
-                            'module does not define a class inheriting Pluggram')
+                LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                          'module does not define a class inheriting Pluggram')
                 continue
 
             # 3. ensure the class has a constructor and tick()
             init_func = getattr(module_class, '__init__', None)
 
             if not callable(init_func):
-                LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                            'does not define constructor')
+                LOG.debug(f'load_one("{module_path}", {argument_count}): does not define constructor')
                 continue
 
             tick_func = getattr(module_class, 'tick', None)
 
             if not callable(tick_func):
-                LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                            'does not define tick() method')
+                LOG.debug(f'load_one("{module_path}", {argument_count}): does not define tick() method')
                 continue
 
             # 4. note argument count
@@ -444,9 +437,9 @@ def load_one(module_path: str, module_name: str, argument_count: int):
                         positional_count += 1
 
             if positional_count > argument_count:
-                LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                            f'constructor positional arguments mismatch ({positional_count} wanted, '
-                            f'{argument_count} given)')
+                LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                          f'constructor positional arguments mismatch ({positional_count} wanted, '
+                          f'{argument_count} given)')
                 continue
 
             # 5. collect metadata
@@ -467,21 +460,21 @@ def load_one(module_path: str, module_name: str, argument_count: int):
 
                 if tick_rate is not None and tick_rate < 0:
                     if tick_rate == -1:
-                        LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                    f'tick rate does not match regex "{INTERVAL_PATTERN.pattern}"')
+                        LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                                  f'tick rate does not match regex "{INTERVAL_PATTERN.pattern}"')
                     elif tick_rate == -2:
-                        LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                    f'tick rate must be positive, zero or None.')
+                        LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                                  f'tick rate must be positive, zero or None.')
                     elif tick_rate == -3:
-                        LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                    f'failed to parse tick rate.')
+                        LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                                  f'failed to parse tick rate.')
                     elif tick_rate == -4:
-                        LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                    f'unknown tick rate multiplier.')
+                        LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                                  f'unknown tick rate multiplier.')
                     continue
             else:
-                LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                            f'"TICK_RATE" property required')
+                LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                          f'"TICK_RATE" property required')
                 continue
 
             option_definitions = []
@@ -489,8 +482,8 @@ def load_one(module_path: str, module_name: str, argument_count: int):
                 if isinstance(module_class.OPTIONS, list):
                     option_definitions = module_class.OPTIONS
                 else:
-                    LOG.warning(f'disqualifying {module_name}.{class_name}: '
-                                f'"OPTIONS" property is not a list')
+                    LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                              f'"OPTIONS" property is not a list')
                     continue
 
             meta = PluggramMetadata(module_path,
@@ -503,10 +496,10 @@ def load_one(module_path: str, module_name: str, argument_count: int):
                                     positional_count,
                                     options=option_definitions)
 
-            LOG.info(f'loaded pluggram {class_name} ("{module_path}")')
+            LOG.debug(f'load_one("{module_path}", {argument_count}): loaded pluggram {class_name}')
             break
 
-    return meta, module_class
+    return meta
 
 
 def load(programs_dir: str, argument_count):
@@ -514,46 +507,61 @@ def load(programs_dir: str, argument_count):
         raise RuntimeError('Programs directory does not exist or is not a directory')
 
     pluggram_metas = []
-    pluggram_classes = []
 
     for _, dirs, _ in os.walk(programs_dir, topdown=True, followlinks=False):
         for module_name in dirs:
             module_path = os.path.abspath(os.path.join(programs_dir, module_name))
             if os.path.exists(module_path):
-                meta, klass = load_one(module_path, module_name, argument_count)
+                meta = load_one(module_path, argument_count)
                 pluggram_metas.append(meta)
-                pluggram_classes.append(klass)
 
-    return pluggram_metas, pluggram_classes
+    return pluggram_metas
 
 
-def _worker(meta: PluggramMetadata,
-            args: list,
-            kwargs: dict,
-            stop_event: Event):
-    _, live_type = load_one(meta.module_path, meta.name, meta.positional_count)
-
+def pluggram_process(module_path: str,
+                     module_name: str,
+                     screen_url: str,
+                     tick_rate: Optional[int],
+                     filled_options: dict,
+                     stop_event: Event):
+    abort = False
     try:
-        instance = meta.init(live_type, *args, **kwargs)
-    except Exception as e:
-        LOG.error(
-            f'exception {e.__class__.__name__} initializing pluggram "{meta.name}" ({meta.class_name}): {str(e)}')
-        LOG.error(traceback.format_exc())
-        return
+        klass_name, live_type = load_type(module_path)
+    except TypeError:
+        LOG.error('failed to get module class type, try restarting')
+        abort = True
 
-    rate = meta.tick_rate
-    marker = -rate
-    while True:
-        if (rate is not None and timing_counter() - marker > rate) or rate is None:
-            marker = timing_counter()
-            try:
-                instance.tick()
-            except Exception as e:
-                LOG.error(f'exception while ticking pluggram "{meta.name}": {str(e)}')
-                LOG.error(traceback.format_exc())
-                stop_event.set()
-        if stop_event.is_set():
-            break
+    if not abort:
+        # start screen RPC client
+        context = zmq.Context()
+        screen_client = RPCClient(
+            MSGPACKRPCProtocol(),
+            ZmqClientTransport.create(context, screen_url)
+        )
+        screen_proxy = screen_client.get_proxy()
+        screen = rpc.Screen(screen_proxy)
+
+        try:
+            instance = live_type(screen, **filled_options)
+        except Exception as e:
+            LOG.error(
+                f'exception {e.__class__.__name__} initializing pluggram "{module_name}": {str(e)}')
+            LOG.error(traceback.format_exc())
+            abort = True
+
+        if not abort:
+            marker = -tick_rate
+            while True:
+                if (tick_rate is not None and timing_counter() - marker > tick_rate) or tick_rate is None:
+                    marker = timing_counter()
+                    try:
+                        instance.tick()
+                    except Exception as e:
+                        LOG.error(f'exception while ticking pluggram "{module_name}": {str(e)}')
+                        LOG.error(traceback.format_exc())
+                        stop_event.set()
+                if stop_event.is_set():
+                    break
 
 
 class PluggramRunner:
@@ -563,38 +571,40 @@ class PluggramRunner:
         return self._meta
 
     @property
-    def running(self):
+    def is_running(self):
         return self._meta is not None and self._proc is not None and self._proc.is_alive()
+
+    @property
+    def running(self) -> Optional[PluggramMetadata]:
+        return self._meta
 
     def __init__(self):
         self._proc = None
         self._meta = None
         self._event_stop = Event()
 
-    def start(self, meta: PluggramMetadata, *args, **kwargs) -> bool:
+    def start(self, meta: PluggramMetadata, screen_url: str):
         self.stop()
         self._event_stop.clear()
         self._meta = meta
+        filled_options = meta.get_filled_options()
 
         LOG.info(f'starting pluggram worker for program {self._meta.name}')
-        self._proc = Process(target=_worker, args=(self._meta,
-                                                   args,
-                                                   kwargs,
-                                                   self._event_stop))
+        self._proc = Process(target=pluggram_process, args=(meta.module_path,
+                                                            meta.name,
+                                                            screen_url,
+                                                            meta.tick_rate,
+                                                            filled_options,
+                                                            self._event_stop))
         self._proc.start()
         LOG.info(f'started pluggram worker for program {self._meta.name}')
 
-        return True
-
     def stop(self):
         LOG.info('stopping pluggram worker')
-        if self.running:
+        if self.is_running:
             self._event_stop.set()
             self._proc.join()
             self._meta = None
             LOG.info('stopped pluggram worker')
             return True
         return False
-
-
-runner = PluggramRunner()

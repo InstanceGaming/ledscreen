@@ -57,5 +57,5 @@ if __name__ == '__main__':
         dispatcher
     )
 
-    LOG.info('Serving...')
+    LOG.info('serving...')
     rpc_server.serve_forever()

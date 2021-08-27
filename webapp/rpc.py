@@ -214,8 +214,8 @@ class PluggramManager:
     def get_running(self) -> Optional[str]:
         return self._rpc.get_running()
 
-    def start(self, name: str) -> bool:
-        return self._rpc.start(name)
+    def start(self, name: str):
+        self._rpc.start(name)
 
-    def stop(self):
-        self._rpc.stop()
+    def stop(self) -> bool:
+        return self._rpc.stop()

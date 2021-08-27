@@ -47,7 +47,9 @@ class RunPluggram(Resource):
         if selected_name is None:
             return {'query_name': query_name}, 404
         else:
+            LOG.info(f'requesting start of pluggram "{selected_name}"')
             pluggram_manager.start(selected_name)
+            LOG.info(f'started pluggram "{selected_name}"')
             return {'query_name': query_name}, 200
 
 
@@ -70,7 +72,9 @@ class StopPluggram(Resource):
         running_name = pluggram_manager.get_running()
 
         if running_name:
+            LOG.info(f'requesting stop of running pluggram')
             pluggram_manager.stop()
+            LOG.info(f'stopped {running_name}')
 
             if clear:
                 screen.clear()

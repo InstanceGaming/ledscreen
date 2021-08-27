@@ -1,16 +1,17 @@
 import argparse
-
-from tinyrpc import RPCClient
-
-import rpc
+import zmq
+import logging
+from utils import configure_logger
 from api import PluggramManager
 from tinyrpc.dispatch import RPCDispatcher
-import zmq
 from tinyrpc.server import RPCServer
 from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
-from tinyrpc.transports.zmq import ZmqServerTransport, ZmqClientTransport
-
+from tinyrpc.transports.zmq import ZmqServerTransport
 from pluggram import load
+
+LOG = logging.Logger('pluggramd')
+configure_logger(LOG)
+
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='Manages pluggram system')
@@ -32,16 +33,8 @@ if __name__ == '__main__':
     screen_rpc_url = cla.screen_rpc_url
     rpc_url = cla.rpc_url
 
-    context = zmq.Context()
-    screen_client = RPCClient(
-        MSGPACKRPCProtocol(),
-        ZmqClientTransport.create(context, screen_rpc_url)
-    )
-    screen_proxy = screen_client.get_proxy()
-    scr = rpc.Screen(screen_proxy)
-
     metadata = load(programs_dir, 1)
-    manager = PluggramManager(metadata, scr)
+    manager = PluggramManager(metadata, screen_rpc_url)
 
     dispatcher = RPCDispatcher()
     dispatcher.register_instance(manager)
@@ -53,5 +46,5 @@ if __name__ == '__main__':
         dispatcher
     )
 
-    print('Serving...')
+    LOG.info('serving...')
     rpc_server.serve_forever()
