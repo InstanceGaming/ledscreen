@@ -1,6 +1,6 @@
+from rpc import PluggramManager
 from turtle import Screen
 from dotted.collection import DottedDict
-from rpc import PluggramManager
 
 
 screen: Screen

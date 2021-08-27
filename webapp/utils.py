@@ -1,7 +1,7 @@
-import time
-import random
 import os
+import time
 import pytoml
+import random
 import logging
 from dotted.collection import DottedDict, DottedList
 
@@ -14,7 +14,7 @@ DEV_FORMATTER = logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
 FORMATTER = logging.Formatter('{levelname:>8}: {message}', style='{')
 
 
-def configure_logger(log, prod_level=logging.INFO):
+def configure_logger(log):
     handler = logging.StreamHandler()
 
     # noinspection PyUnreachableCode
@@ -75,7 +75,8 @@ class ConfigValidator:
 
             if required_type is not None:
                 if not isinstance(value, required_type):
-                    LOG.error(f'"{abs_key}" must be of type {required_type.__name__}')
+                    LOG.error(f'"{abs_key}" must be of type '
+                              f'{required_type.__name__}')
                     exit(3)
         else:
             LOG.error(f'"{abs_key}" must be defined')
@@ -156,7 +157,9 @@ def pretty_timedelta(td, prefix=None, format_spec=None):
     return None
 
 
-def generate_sanitized_alphanumerics(length: int, lowercase=True, special=False):
+def generate_sanitized_alphanumerics(length: int,
+                                     lowercase=True,
+                                     special=False):
     char_set = 'BCDFGHJKLMNPQRSTVWXYZ0123456789'
 
     if lowercase:

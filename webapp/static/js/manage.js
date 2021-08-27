@@ -171,6 +171,22 @@ function add_params_to_url(url, params)
 let settings_forms = {};
 const settings_submit_btns = $(".settings-modal-submit");
 
+function rgb_to_bgr(rgb)
+{
+    const r = (rgb >> 16) & 0xFF;
+    const g = (rgb >> 8) & 0xFF;
+    const b = rgb & 0xFF;
+    return (b << 16) | (g << 8) | r;
+}
+
+function bgr_to_rgb(bgr)
+{
+    const r = bgr & 0xFF;
+    const g = (bgr >> 8) & 0xFF;
+    const b = (bgr >> 16) & 0xFF;
+    return r | (g << 8) | (b << 16);
+}
+
 function save_program_settings(program_name)
 {
     const modal_form = settings_forms[program_name];
@@ -189,18 +205,13 @@ function save_program_settings(program_name)
         }
         else if (input_type == "color")
         {
-            value_map[option_key] = parseInt(option_value.substring(1), 16);
+            const as_number = parseInt(option_value.substring(1), 16);
+            const bgr = rgb_to_bgr(as_number);
+            value_map[option_key] = bgr;
         }
         else if (input_type == "checkbox")
         {
-            if (option_value === "on")
-            {
-                value_map[option_key] = true;
-            }
-            else
-            {
-                value_map[option_key] = false;
-            }
+            value_map[option_key] = $(input).prop("checked");
         }
         else
         {
@@ -212,16 +223,54 @@ function save_program_settings(program_name)
     $.post(path, value_map, function(data, textStatus, jqXHR){
         filter_status_response(jqXHR, function() {
             display_name = data["display_name"];
-            saved = data["saved"];
-            iziToast.show({
-                title: `Updated ${display_name}`,
-                message: saved ? 'New values stored successfully.' : 'No fields needed updating.',
-                drag: false,
-                theme: 'dark',
-                backgroundColor: '#0d6efd',
-                icon: 'bi bi-pen'
-            });
-            return true;
+            updated_keys = data["updated"];
+            unmapped_keys = data["unmapped"]
+
+            if (unmapped_keys.length > 0)
+            {
+                console.log("unmapped keys:");
+                for (const umk of unmapped_keys)
+                {
+                    console.log(`- ${umk}`);
+                }
+
+                iziToast.show({
+                    title: `Partial save for ${display_name}`,
+                    message: `${unmapped_keys.length} fields could not be
+                              updated, ${updated_keys.length} did update`,
+                    drag: false,
+                    theme: 'dark',
+                    backgroundColor: '#dda458',
+                    icon: 'bi bi-pen'
+                });
+            }
+            else
+            {
+                if (updated_keys.length > 0)
+                {
+                    iziToast.show({
+                        title: `Saved ${display_name}`,
+                        message: `Updated ${updated_keys.length} fields`,
+                        drag: false,
+                        theme: 'dark',
+                        backgroundColor: '#0d6efd',
+                        icon: 'bi bi-pen'
+                    });
+                    return true;
+                }
+                else
+                {
+                    iziToast.show({
+                        title: `No change to ${display_name}`,
+                        message: 'No field values changed',
+                        drag: false,
+                        theme: 'dark',
+                        backgroundColor: '#0d6efd',
+                        icon: 'bi bi-pen'
+                    });
+                    return true;
+                }
+            }
         });
     });
 }

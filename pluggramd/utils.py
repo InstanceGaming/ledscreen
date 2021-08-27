@@ -1,6 +1,7 @@
-import time
 import os
+import time
 import logging
+
 
 LOG = logging.getLogger('ledscreen.utils')
 DEV_FORMATTER = logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
@@ -9,7 +10,7 @@ DEV_FORMATTER = logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
 FORMATTER = logging.Formatter('{levelname:>8}: {message}', style='{')
 
 
-def configure_logger(log, prod_level=logging.INFO):
+def configure_logger(log):
     handler = logging.StreamHandler()
 
     # noinspection PyUnreachableCode

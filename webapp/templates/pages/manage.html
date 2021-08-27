@@ -86,7 +86,7 @@
                                 <input type="color" class="form-control form-control-color"
                                        id="setting-input-{{ opt.markup_id }}"
                                        data-program-option="{{ opt.markup_id }}"
-                                       value="#{{ '%x' | format(opt.value) }}"
+                                       value="#{{ '%x' | format(opt.rgb_color) }}"
                                        title="Pick a color">
                             {% else %}
                                 <input type="number"
@@ -108,9 +108,11 @@
                             <div class="col-sm-7 offset-sm-5">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox"
-                                           checked="{{ 'on' if opt.value else 'off' }}"
                                            data-program-option="{{ opt.markup_id }}"
-                                           id="setting-input-{{ opt.markup_id }}"/>
+                                           id="setting-input-{{ opt.markup_id }}"
+                                           {% if opt.value %}
+                                           checked
+                                           {% endif %}/>
                                     <label class="form-check-label"
                                            for="setting-input-{{ opt.markup_id }}"
                                            title="{{ opt.help_text or opt.display_name}}">

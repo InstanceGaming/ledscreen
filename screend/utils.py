@@ -1,8 +1,9 @@
-import time
 import os
+import time
 import pytoml
 import logging
 from dotted.collection import DottedDict
+
 
 LOG = logging.getLogger('ledscreen.utils')
 DEV_FORMATTER = logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
@@ -11,7 +12,7 @@ DEV_FORMATTER = logging.Formatter('{levelname:>8}: {message} [{name}@{lineno}]',
 FORMATTER = logging.Formatter('{levelname:>8}: {message}', style='{')
 
 
-def configure_logger(log, prod_level=logging.INFO):
+def configure_logger(log):
     handler = logging.StreamHandler()
 
     # noinspection PyUnreachableCode
@@ -68,7 +69,8 @@ class ConfigValidator:
 
             if required_type is not None:
                 if not isinstance(value, required_type):
-                    LOG.error(f'"{abs_key}" must be of type {required_type.__name__}')
+                    LOG.error(f'"{abs_key}" must be of type '
+                              f'{required_type.__name__}')
                     exit(3)
                 else:
                     if isdir and not os.path.isdir(value):

@@ -1,8 +1,8 @@
 
 
 def unix_get_ip_address(filter_if_name: str):
-    import socket
     import fcntl
+    import socket
     import struct
 
     if_name_bytes = bytes(filter_if_name[:15], 'UTF-8')
@@ -18,7 +18,7 @@ def unix_get_ip_address(filter_if_name: str):
 
 
 def get_ip_address(filter_if_name: str):
-    from netifaces import ifaddresses, AF_INET
+    from netifaces import AF_INET, ifaddresses
     interface = ifaddresses(filter_if_name)
     protocol = interface[AF_INET]
     return protocol[0]['addr']

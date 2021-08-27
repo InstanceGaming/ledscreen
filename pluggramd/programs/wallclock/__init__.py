@@ -1,6 +1,6 @@
-from datetime import datetime as dt
-from pluggram import Pluggram, Option
 from rpc import Screen
+from datetime import datetime as dt
+from pluggram import Option, Pluggram
 
 
 class WallClock(Pluggram):
@@ -10,13 +10,21 @@ class WallClock(Pluggram):
     TICK_RATE = '500ms'
     OPTIONS = [
         Option('brightness', 128, min=1, max=190),
-        Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True, help='Color of all rendered text.'),
-        Option('background', 0, min=0, max=0xFFFFFF, color_picker=True, help='Color behind text.'),
-        Option('stroke_thickness', 0, min=0, max=10, help='Number of pixels to outline around time text.'),
-        Option('stroke_color', 0, min=0, max=0xFFFFFF, color_picker=True, help='Color of outline around time text.'),
-        Option('show_seconds', True, help='Show seconds next to minutes counter.'),
-        Option('flash_colon', True, help='Either maintain a static colon symbol or flash it every second.'),
-        Option('show_date', False, help='Show current date above time.')
+        Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True,
+               help='Color of all rendered text.'),
+        Option('background', 0, min=0, max=0xFFFFFF, color_picker=True,
+               help='Color behind text.'),
+        Option('stroke_thickness', 0, min=0, max=10,
+               help='Number of pixels to outline around time text.'),
+        Option('stroke_color', 0, min=0, max=0xFFFFFF, color_picker=True,
+               help='Color of outline around time text.'),
+        Option('show_seconds', True,
+               help='Show seconds next to minutes counter.'),
+        Option('flash_colon', True,
+               help='Either maintain a static colon symbol or flash it '
+                    'every second.'),
+        Option('show_date', False,
+               help='Show current date above time.')
     ]
     FONT_REG = 'arial.ttf'
     FONT_BOLD = 'arialbd.ttf'
@@ -69,7 +77,8 @@ class WallClock(Pluggram):
             self._screen.set_font(self.FONT_BOLD, size=self.LARGE_FONT)
 
         # time
-        time_pos = (center[0], self._screen.height - 2) if self._show_date else center
+        time_pos = (center[0], self._screen.height - 2) if self._show_date \
+            else center
         self._screen.draw_text(time_pos[0],
                                time_pos[1],
                                self._foreground,

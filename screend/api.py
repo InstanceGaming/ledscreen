@@ -1,12 +1,12 @@
 import io
-import logging
 import os
-import pathlib
 import utils
-from io import BytesIO
-from typing import Tuple, Optional, List
-from PIL import Image, ImageFont, ImageDraw
+import logging
+import pathlib
+from PIL import Image, ImageDraw, ImageFont
+from typing import List, Tuple, Optional
 from tinyrpc.dispatch import public
+
 
 try:
     import rpi_ws281x
@@ -140,14 +140,18 @@ class Screen:
             raise ValueError('Brightness must be within range 0-255')
 
         if v > self._max_brightness:
-            raise RuntimeError('Too much current would be drawn with given global brightness amount, '
-                               'crashed to prevent blowing all the supply fuses')
+            raise RuntimeError('Too much current would be drawn with given'
+                               'global brightness amount, crashed to prevent '
+                               'blowing all the supply fuses')
 
         self._matrix.setBrightness(v)
         self.LOG.info('screen brightness changed ({})'.format(v))
 
     @public
-    def set_font(self, name: str, size: Optional[int], font_face: Optional[int]) -> bool:
+    def set_font(self,
+                 name: str,
+                 size: Optional[int],
+                 font_face: Optional[int]) -> bool:
         name = name.lower().strip()
         unique_name = name
 
@@ -176,7 +180,8 @@ class Screen:
                 ext = pathlib.Path(font_path).suffix
 
                 if ext == '.ttf':
-                    self._current_font = ImageFont.truetype(font_path, size, font_face or 0)
+                    self._current_font = ImageFont.truetype(font_path, size,
+                                                            font_face or 0)
                     self.LOG.info(f'loaded TrueType font "{name}"')
                 else:
                     self._current_font = ImageFont.load(font_path)
@@ -185,7 +190,8 @@ class Screen:
                 self._cached_fonts.update({unique_name: self._current_font})
                 return True
             except OSError:
-                self.LOG.debug(f'failed to load font "{name}" from "{self._fonts_dir}"')
+                self.LOG.debug(f'failed to load font "{name}" from '
+                               f'"{self._fonts_dir}"')
 
         return False
 
@@ -241,10 +247,12 @@ class Screen:
     def fill(self, color: int, box: Optional[Tuple[int, int, int, int]]):
         if box is not None:
             if not isinstance(box, tuple):
-                raise ValueError('box must be a tuple of structure (x1, y1, x2, y2)')
+                raise ValueError('box must be a tuple of structure (x1, y1, '
+                                 'x2, y2)')
 
             if len(box) != 4:
-                raise ValueError('box must be a tuple of structure (x1, y1, x2, y2)')
+                raise ValueError('box must be a tuple of structure (x1, y1, '
+                                 'x2, y2)')
 
         self._painter.rectangle(box or (0, 0, self._w, self._h), fill=color)
 
@@ -264,7 +272,8 @@ class Screen:
                   color: Optional[int],
                   width: Optional[int],
                   rounded: bool):
-        self._painter.line((x, y), fill=color, width=width, joint='curve' if rounded else None)
+        self._painter.line((x, y), fill=color, width=width,
+                           joint='curve' if rounded else None)
 
     @public
     def clear(self):

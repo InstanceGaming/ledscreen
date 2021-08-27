@@ -1,13 +1,12 @@
-import argparse
-import logging
-
-from tinyrpc.dispatch import RPCDispatcher
-import utils
 import zmq
-from tinyrpc.server import RPCServer
-from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
-from tinyrpc.transports.zmq import ZmqServerTransport
+import utils
+import logging
+import argparse
 from api import Screen
+from tinyrpc.server import RPCServer
+from tinyrpc.dispatch import RPCDispatcher
+from tinyrpc.transports.zmq import ZmqServerTransport
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
 
 
 LOG = logging.Logger('screend')
@@ -15,7 +14,8 @@ utils.configure_logger(LOG)
 
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(description='Manages all drawing to the LED screen')
+    ap = argparse.ArgumentParser(description='Manages all drawing to the '
+                                             'LED screen')
     ap.add_argument('-c', '--config',
                     type=str,
                     metavar='PATH',

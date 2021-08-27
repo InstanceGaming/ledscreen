@@ -1,6 +1,6 @@
 import logging
-from common import config, pluggram_manager
 from flask import Blueprint, render_template
+from common import config, pluggram_manager
 from .authentication import auth_or_login
 
 

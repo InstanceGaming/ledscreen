@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta
 import utils
-from pluggram import Pluggram, Option
 from rpc import Screen
+from datetime import datetime, timedelta
+from pluggram import Option, Pluggram
 
 
 class BackSoon(Pluggram):
@@ -55,7 +55,8 @@ class BackSoon(Pluggram):
             duration = self._end - datetime.now()
 
             if duration.total_seconds() > 0:
-                duration_text = utils.pretty_timedelta(duration, format_spec='.0f')
+                duration_text = utils.pretty_timedelta(duration,
+                                                       format_spec='.0f')
             else:
                 duration_text = 'UNKNOWN'
 

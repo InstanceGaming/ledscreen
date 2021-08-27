@@ -1,16 +1,14 @@
-import json
 import os
-
-import zmq
-from tinyrpc import RPCClient
-from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
-from tinyrpc.transports.zmq import ZmqClientTransport
-
 import api
-from utils import timing_counter
-from pluggram import load
-import traceback
+import zmq
+import json
 import argparse
+import traceback
+from utils import timing_counter
+from tinyrpc import RPCClient
+from pluggram import load
+from tinyrpc.transports.zmq import ZmqClientTransport
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
 
 
 def get_cla():
@@ -36,7 +34,8 @@ def get_cla():
     ap.add_argument(type=str,
                     metavar='MODULE_NAME',
                     dest='module_name',
-                    help='Name of a pluggram module to load within the configured programs directory.')
+                    help='Name of a pluggram module to load within the '
+                         'configured programs directory.')
     ap.add_argument(type=str,
                     metavar='URL',
                     dest='rpc_url',
@@ -98,7 +97,8 @@ if __name__ == '__main__':
         try:
             instance = pgm.init(pgc, screen)
         except Exception as e:
-            print(f'exception {e.__class__.__name__} initializing pluggram "{pgm.name}" ({pgm.class_name}): {str(e)}')
+            print(f'exception {e.__class__.__name__} initializing pluggram '
+                  f'"{pgm.name}" ({pgm.class_name}): {str(e)}')
             print(traceback.format_exc())
             exit(100)
 
@@ -108,12 +108,14 @@ if __name__ == '__main__':
         marker = -rate if rate is not None else timing_counter()
         try:
             while True:
-                if (rate is not None and timing_counter() - marker > rate) or rate is None:
+                if (rate is not None and timing_counter() - marker > rate) or \
+                        rate is None:
                     marker = timing_counter()
                     try:
                         instance.tick()
                     except Exception as e:
-                        print(f'exception {e.__class__.__name__} updating pluggram "{pgm.name}": {str(e)}')
+                        print(f'exception {e.__class__.__name__} updating '
+                              f'pluggram "{pgm.name}": {str(e)}')
                         print(traceback.format_exc())
                         exit(101)
 

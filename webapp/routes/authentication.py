@@ -1,12 +1,14 @@
-from flask import (Blueprint,
-                   request,
-                   render_template,
-                   redirect,
-                   abort,
-                   url_for, make_response)
-import system
 import enum
+import system
 import logging
+from flask import (Blueprint,
+                   abort,
+                   request,
+                   url_for,
+                   redirect,
+                   make_response,
+                   render_template)
+
 
 LOG = logging.getLogger('ledscreen.web.auth')
 bp = Blueprint('auth', __name__)
@@ -21,7 +23,8 @@ class LoginMessage(enum.IntEnum):
 
 def auth_or_login():
     if not system.is_user_authenticated():
-        return abort(redirect(url_for('auth.login', mid=int(LoginMessage.NOT_AUTHENTICATED))))
+        return abort(redirect(url_for('auth.login',
+                                      mid=int(LoginMessage.NOT_AUTHENTICATED))))
     else:
         system.user_state.ping()
 

@@ -1,11 +1,11 @@
 import io
-from typing import Tuple, Optional, List, Union
-from dataclasses import dataclass
-from enum import IntFlag
-from functools import lru_cache
-from threading import Lock
-from PIL.Image import Image
 import utils
+from enum import IntFlag
+from typing import List, Tuple, Union, Optional
+from functools import lru_cache
+from PIL.Image import Image
+from threading import Lock
+from dataclasses import dataclass
 
 
 class Screen:
@@ -80,7 +80,10 @@ class Screen:
                         spacing=None,
                         features=None,
                         stroke_width=None) -> Tuple[int, int]:
-        return self._rpc.text_dimensions(message, spacing, features, stroke_width)
+        return self._rpc.text_dimensions(message,
+                                         spacing,
+                                         features,
+                                         stroke_width)
 
     def index_of(self,
                  x: int,
@@ -97,7 +100,15 @@ class Screen:
                   alignment=None,
                   stroke_width=None,
                   stroke_fill=None):
-        self._rpc.draw_text(x, y, color, message, anchor, spacing, alignment, stroke_width, stroke_fill)
+        self._rpc.draw_text(x,
+                            y,
+                            color,
+                            message,
+                            anchor,
+                            spacing,
+                            alignment,
+                            stroke_width,
+                            stroke_fill)
 
     def fill(self,
              color: int,
@@ -148,7 +159,7 @@ class Option:
     choices: Optional[List[str]]
     min: Optional[Union[int, float]]
     max: Optional[Union[int, float]]
-    value: Optional[Union[int, float, bool, str]]
+    value: Union[int, float, bool, str]
     help_text: Optional[str]
 
     @property
@@ -165,14 +176,22 @@ class Option:
             raise NotImplementedError()
 
     @property
-    @lru_cache
     def display_name(self):
         return utils.get_key_display_name(self.name)
 
     @property
-    @lru_cache
     def markup_id(self):
         return self.name.replace('_', '-').lower()
+
+    @property
+    def rgb_color(self):
+        if self.type_name == 'INT':
+            bgr = self.value
+            r = bgr & 0xFF
+            g = (bgr >> 8) & 0xFF
+            b = (bgr >> 16) & 0xFF
+            return (r << 16) | (g << 8) | b
+        return None
 
 
 @dataclass(frozen=True)
@@ -211,12 +230,21 @@ class PluggramManager:
         self._unlock()
 
         if not options:
-            return PluggramInfo(name, display_name, description, version, tick_rate, None)
+            return PluggramInfo(name,
+                                display_name,
+                                description,
+                                version,
+                                tick_rate,
+                                None)
         else:
             opts = self.get_options(name)
-            return PluggramInfo(name, display_name, description, version, tick_rate, opts)
+            return PluggramInfo(name,
+                                display_name,
+                                description,
+                                version,
+                                tick_rate,
+                                opts)
 
-    @lru_cache(maxsize=10)
     def get_options(self, name: str) -> List[Option]:
         options = []
         self._lock()
@@ -234,11 +262,20 @@ class PluggramManager:
             help_text = flat_option[7]
             input_type = flat_option[8]
             input_method = InputMethod(input_type)
-            options.append(Option(name, type_name, default, input_method, choices, min_val, max_val, value, help_text))
+            options.append(Option(name,
+                                  type_name,
+                                  default,
+                                  input_method,
+                                  choices,
+                                  min_val,
+                                  max_val,
+                                  value,
+                                  help_text))
 
         return options
 
-    def save_options(self, name: str, options: dict) -> List[str]:
+    def save_options(self, name: str, options: dict) -> Tuple[List[str],
+                                                              List[str]]:
         self._lock()
         rv = self._rpc.save_options(name, options)
         self._unlock()

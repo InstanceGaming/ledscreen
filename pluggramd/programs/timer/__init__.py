@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta
-from pluggram import Pluggram, Option
 from rpc import Screen
+from datetime import datetime, timedelta
+from pluggram import Option, Pluggram
 
 
 def better_timedelta_format(td):
@@ -23,11 +23,16 @@ class Timer(Pluggram):
     TICK_RATE = '100ms'
     OPTIONS = [
         Option('brightness', 128, min=1, max=190),
-        Option('minutes', 5, min=0.125, help='How many minutes the timer will last.'),
-        Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True, help='Color of all rendered text.'),
-        Option('background', 0, min=0, max=0xFFFFFF, color_picker=True, help='Color behind text.'),
-        Option('stroke_thickness', 0, min=0, max=10, help='Number of pixels to outline around time text.'),
-        Option('stroke_color', 0, min=0, max=0xFFFFFF, color_picker=True, help='Color of outline around time text.')
+        Option('minutes', 5, min=0.125,
+               help='How many minutes the timer will last.'),
+        Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True,
+               help='Color of all rendered text.'),
+        Option('background', 0, min=0, max=0xFFFFFF, color_picker=True,
+               help='Color behind text.'),
+        Option('stroke_thickness', 0, min=0, max=10,
+               help='Number of pixels to outline around time text.'),
+        Option('stroke_color', 0, min=0, max=0xFFFFFF, color_picker=True,
+               help='Color of outline around time text.')
     ]
     FONT = 'arialbd.ttf'
     FONT_SIZE = 19

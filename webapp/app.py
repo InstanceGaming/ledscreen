@@ -1,15 +1,19 @@
-import signal
-import flask
-import logging
 import rpc
-import netutils
 import zmq
+import flask
 import common
+import signal
+import logging
+import netutils
+from utils import (load_config,
+                   get_config_path,
+                   validate_config,
+                   configure_logger)
 from tinyrpc import RPCClient
-from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
-from tinyrpc.transports.zmq import ZmqClientTransport
-from utils import load_config, configure_logger, validate_config, get_config_path
 from flask_minify import minify
+from tinyrpc.transports.zmq import ZmqClientTransport
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
+
 
 VERSION = '1.0.0'
 LOG = logging.getLogger('ledscreen')
@@ -51,7 +55,7 @@ def create_app():
     common.screen = scr
     common.pluggram_manager = plugman
 
-    from routes import authentication, management, endpoints
+    from routes import endpoints, management, authentication
 
     app.register_blueprint(authentication.bp)
     app.register_blueprint(management.bp)

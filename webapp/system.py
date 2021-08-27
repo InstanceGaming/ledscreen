@@ -1,13 +1,13 @@
-import hmac
-import logging
 import os
 import re
-import subprocess
+import hmac
 import utils
-from common import config, screen
+import logging
+import subprocess
 from flask import request
-from datetime import datetime, timedelta
+from common import config, screen
 from typing import Optional
+from datetime import datetime, timedelta
 
 
 LOG = logging.getLogger('ledscreen.system')
@@ -30,8 +30,10 @@ class UserState:
         return False
 
     def login(self):
-        self.session_token = utils.generate_sanitized_alphanumerics(SESSION_TOKEN_LENGTH)
-        self.expiration = datetime.utcnow() + timedelta(minutes=config.get('app.max_session_minutes'))
+        self.session_token = \
+            utils.generate_sanitized_alphanumerics(SESSION_TOKEN_LENGTH)
+        self.expiration = (datetime.utcnow() + timedelta(minutes=config.get(
+            'app.max_session_minutes')))
         self.ping()
         LOG.info(f'authenticated user with session {user_state.session_token}')
 
@@ -39,7 +41,8 @@ class UserState:
         self.last_activity = datetime.utcnow()
 
     def logout(self):
-        LOG.info(f'unauthenticated user from session {user_state.session_token}')
+        LOG.info(f'unauthenticated user from session '
+                 f'{user_state.session_token}')
         self.session_token = None
 
     def validate_session(self, b: str):
@@ -106,8 +109,7 @@ def shutdown():
         return_code = proc.wait(2)
         LOG.debug(f'poweroff return-code {return_code}')
     else:
-        raise NotImplementedError('Intentionally left unimplemented; this system is only used on Linux, developed on '
-                                  'Windows.')
+        raise NotImplementedError('Intentionally left unimplemented')
 
 
 def restart():
@@ -124,4 +126,4 @@ def restart():
         proc = subprocess.Popen(['reboot'])
         proc.wait()
     else:
-        raise NotImplementedError('Intentionally left unimplemented; this system is only used on Linux')
+        raise NotImplementedError('Intentionally left unimplemented')

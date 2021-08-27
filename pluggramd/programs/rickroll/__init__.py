@@ -1,7 +1,7 @@
 import os
 from PIL import Image
-from pluggram import Pluggram, Option
 from rpc import Screen
+from pluggram import Option, Pluggram
 
 
 class Rickroll(Pluggram):

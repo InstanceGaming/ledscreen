@@ -1,8 +1,8 @@
 import utils
-from pluggram import Pluggram, Option
+import random
 from rpc import Screen
 from utils import timing_counter
-import random
+from pluggram import Option, Pluggram
 
 
 class ScrollingText(Pluggram):

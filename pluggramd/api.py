@@ -1,7 +1,7 @@
 from typing import List, Tuple, Union, Optional
-from tinyrpc.dispatch import public
-from pluggram import PluggramMetadata, PluggramRunner
+from pluggram import PluggramRunner, PluggramMetadata
 from functools import lru_cache
+from tinyrpc.dispatch import public
 
 
 class PluggramManager:
@@ -40,7 +40,8 @@ class PluggramManager:
                                                    Optional[Union[int, float]],
                                                    Optional[Union[int, float]],
                                                    Union[int, float, bool, str],
-                                                   Optional[Union[int, float, bool, str]],
+                                                   Optional[Union[int, float,
+                                                                  bool, str]],
                                                    Optional[str],
                                                    int]]:
         metadata = self._find_by_name(name)
@@ -60,9 +61,10 @@ class PluggramManager:
         return data
 
     @public
-    def save_options(self, name: str, options: dict) -> List[str]:
+    def save_options(self, name: str, options: dict) -> Tuple[List[str],
+                                                              List[str]]:
         m = self._find_by_name(name)
-        return list(m.save_options(options))
+        return m.save_options(options)
 
     @public
     def get_running(self) -> Optional[str]:
