@@ -39,12 +39,14 @@ class BackSoon(Pluggram):
         center = self._screen.center
 
         self._screen.set_font(self.FONT, 8)
-        self._screen.draw_text((center[0], 3),
+        self._screen.draw_text(center[0],
+                               3,
                                self._foreground,
                                'WILL BE',
                                anchor='mm',
                                alignment='center')
-        self._screen.draw_text((center[0], 9),
+        self._screen.draw_text(center[0],
+                               9,
                                self._foreground,
                                'BACK IN',
                                anchor='mm',
@@ -58,21 +60,24 @@ class BackSoon(Pluggram):
                 duration_text = 'UNKNOWN'
 
             self._screen.set_font(self.FONT, 9)
-            self._screen.draw_text((center[0], 18),
+            self._screen.draw_text(center[0],
+                                   18,
                                    0x00ffff,
                                    duration_text.upper(),
                                    anchor='mm',
                                    alignment='center')
 
         self._screen.set_font(self.FONT, 8)
-        self._screen.draw_text((center[0], 25),
+        self._screen.draw_text(center[0],
+                               25,
                                self._foreground,
                                'POSTED',
                                anchor='mm',
                                alignment='center')
         if self._flasher:
             self._screen.set_font(self.FONT, 9)
-            self._screen.draw_text((center[0], 33),
+            self._screen.draw_text(center[0],
+                                   33,
                                    0x0000ff,
                                    self._posted_text,
                                    anchor='mm',

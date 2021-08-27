@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import pathlib
@@ -73,7 +74,7 @@ class Screen:
                  antialiasing=False,
                  frames_dir=None):
         super().__init__()
-        self.LOG = logging.getLogger('screend.screen')
+        self.LOG = logging.getLogger('screend.api')
         utils.configure_logger(self.LOG)
 
         self._logger = logging.getLogger()
@@ -112,12 +113,9 @@ class Screen:
         return Image.new(mode, (self._w, self._h), color_data)
 
     @public
-    def paste(self, data: bytes, box: Optional[Tuple[int, int, int, int]], update_painter: bool):
-        img = Image.open(BytesIO(data))
+    def paste(self, data: bytes, box: Optional[Tuple[int, int, int, int]]):
+        img = Image.open(io.BytesIO(data))
         self._canvas.paste(img, box=box)
-
-        if update_painter:
-            self._setup_painter()
 
     @public
     def render(self):
@@ -279,3 +277,8 @@ class Screen:
     @public
     def get_data(self):
         self._canvas.getdata()
+
+    @public
+    def reset_frame_count(self):
+        self.LOG.info('frame counter reset')
+        self._frame_count = 1

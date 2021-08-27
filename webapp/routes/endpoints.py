@@ -48,9 +48,14 @@ class RunPluggram(Resource):
             return {'query_name': query_name}, 404
         else:
             LOG.info(f'requesting start of pluggram "{selected_name}"')
-            pluggram_manager.start(selected_name)
-            LOG.info(f'started pluggram "{selected_name}"')
-            return {'query_name': query_name}, 200
+            did_start = pluggram_manager.start(selected_name)
+
+            if did_start:
+                LOG.info(f'started pluggram "{selected_name}"')
+                return {'query_name': query_name}, 200
+            else:
+                LOG.info(f'pluggram "{selected_name}" is already running')
+                return {'query_name': query_name, 'message': 'already running'}, 400
 
 
 api.add_resource(RunPluggram, '/pluggram/<query_name>/run')
@@ -111,12 +116,12 @@ class PluggramOptions(Resource):
 
                     values.update({key: value})
 
-            invalid_keys, saved = pluggram_manager.save_options(selected_name, values)
+            saved_keys = pluggram_manager.save_options(selected_name, values)
             display_name = pluggram_manager.get_info(selected_name).display_name
+            saved = len(saved_keys) > 0
 
             return {'query_name': query_name,
                     'display_name': display_name,
-                    'invalid_keys': invalid_keys,
                     'saved': saved}, 200
 
 

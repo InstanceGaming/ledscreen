@@ -24,6 +24,27 @@ def configure_logger(log, prod_level=logging.INFO):
     log.addHandler(handler)
 
 
+def combine_rgb(r: int, g: int, b: int):
+    return (r << 16) | (g << 8) | b
+
+
+def pretty_timedelta(td, prefix=None, format_spec=None):
+    prefix = prefix or ''
+    format_spec = format_spec or '02.2f'
+
+    if td is not None:
+        seconds = td.total_seconds()
+        if seconds < 60:
+            return prefix + format(seconds, format_spec) + ' sec'
+        elif 60 <= seconds < 3600:
+            return prefix + format(seconds / 60, format_spec) + ' min'
+        elif 3600 <= seconds < 86400:
+            return prefix + format(seconds / 3600, format_spec) + ' hr'
+        elif 86400 <= seconds:
+            return prefix + format(seconds / 86400, format_spec) + ' days'
+    return None
+
+
 def get_key_display_name(key: str):
     return key.replace('_', ' ').capitalize()
 

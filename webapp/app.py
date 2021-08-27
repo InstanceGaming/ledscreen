@@ -29,6 +29,7 @@ def create_app():
     )
     screen_proxy = screen_client.get_proxy()
     scr = rpc.Screen(screen_proxy)
+    scr.reset_frame_count()
 
     LOG.info(f'started screen RPC client')
 

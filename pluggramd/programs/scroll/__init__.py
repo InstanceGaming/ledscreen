@@ -62,7 +62,8 @@ class ScrollingText(Pluggram):
     def draw_line_message(self):
         self._screen.fill(self._bg)
         if self._centered:
-            self._screen.draw_text((self._x, (self._screen.height / 2)),
+            self._screen.draw_text(self._x,
+                                   (self._screen.height // 2),
                                    self._fg,
                                    self._message,
                                    anchor='lm',
@@ -70,7 +71,8 @@ class ScrollingText(Pluggram):
                                    stroke_width=self._stroke_thickness,
                                    stroke_fill=self._stroke_color)
         else:
-            self._screen.draw_text((self._x, 0),
+            self._screen.draw_text(self._x,
+                                   0,
                                    self._fg,
                                    self._message,
                                    anchor='lt',

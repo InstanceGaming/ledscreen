@@ -1,5 +1,5 @@
 import logging
-from common import config
+from common import config, pluggram_manager
 from flask import Blueprint, render_template
 from .authentication import auth_or_login
 
@@ -12,5 +12,10 @@ bp = Blueprint('manage', __name__, url_prefix='/manage')
 def index():
     auth_or_login()
     name = config['user.name']
-    programs = []
-    return render_template('pages/manage.html', programs=programs, username=name)
+    infos = []
+
+    for name in pluggram_manager.get_names():
+        info = pluggram_manager.get_info(name, options=True)
+        infos.append(info)
+
+    return render_template('pages/manage.html', programs=infos, username=name)

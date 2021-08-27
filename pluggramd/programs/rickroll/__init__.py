@@ -8,21 +8,21 @@ class Rickroll(Pluggram):
     DISPLAY_NAME = 'A Classic'
     DESCRIPTION = 'Plays GIF of an internet classic'
     VERSION = '1.0.0'
-    TICK_RATE = None
+    TICK_RATE = '100ms'
     OPTIONS = [
         Option('brightness', 128, min=1, max=190)
     ]
-    FILE_PATH = 'static/images/rick.gif'
+    FILE = 'media/rick.gif'
 
     def __init__(self,
                  screen: Screen,
                  **options):
         self._screen = screen
 
-        if not os.path.exists(self.FILE_PATH):
-            raise FileNotFoundError('Rick Astley not Found')
+        if not os.path.exists(self.FILE):
+            raise FileNotFoundError(f'Rick Astley not found')
 
-        self._gif = Image.open(self.FILE_PATH)
+        self._gif = Image.open(self.FILE)
         self._frame_count = self._gif.n_frames
         self._frame_index = 0
 

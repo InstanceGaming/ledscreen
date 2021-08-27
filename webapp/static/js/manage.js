@@ -1,34 +1,3 @@
-/*
-const socket = io("/admin");
-let existing_stat_titles = [];
-
-$("#add-student-btn").click(function(event) {
-    socket.emit("my event", {data: "hello?"});
-    console.log("sent");
-    return false;
-});
-
-socket.on("update_stats", function(stats){
-    const stats_container = $("#stats-container");
-
-    for (const title in stats)
-    {
-        if (existing_stat_titles.indexOf(title) < 0)
-        {
-            const value = stats[title];
-            const card_html = `<div class="col-3 my-2">
-                               <div class="stat-box text-center">
-                               <div class="stat-headline">${value}</div>
-                               <div class="stat-description mb-4">${title}</div>
-                               </div>
-                               </div>`;
-            stats_container.append(card_html);
-            existing_stat_titles.push(title);
-        }
-    }
-});
-*/
-
 String.prototype.format = String.prototype.format ||
 function () {
     "use strict";
@@ -53,12 +22,20 @@ $(document).ajaxError(function( event, jqxhr, settings, thrownError ) {
     console.log(jqxhr);
     console.log(settings);
     console.log("--- END XHR ERROR ---");
-    alert(`
-    An XHR error occurred.
-    Check your network connection and try again.
-    If the error persists, contact Jacob.\n
-    Response code: ${jqxhr.status} ${jqxhr.statusText}
-    Endpoint: ${settings.type} ${settings.url}`);
+
+    if (jqxhr.status == 403)
+    {
+        window.location.reload(true);
+    }
+    else
+    {
+        alert(`
+        An XHR error occurred.
+        Check your network connection, refresh and try again.
+        If the error persists, contact Jacob.\n
+        Response code: ${jqxhr.status} ${jqxhr.statusText}
+        Endpoint: ${settings.type} ${settings.url}`);
+    }
 });
 
 function filter_status_response(jqXHR, success)
@@ -261,20 +238,43 @@ for (const btn of settings_submit_btns)
     });
 }
 
-function get_running_program_name()
-{
-    let program_name = null;
-    $.get(POST_RUNNING_PROGRAM, function(data, textStatus, jqXHR){
-        filter_status_response(jqXHR, function() {
-            program_name = data["name"];
-        });
-    });
-    return program_name;
-}
-
 let play_stop_map = {};
 const play_stop_btns = $(".program-start-stop");
 let running_program_name = null;
+
+function update_play_stop_btns()
+{
+    for (const pb of play_stop_btns)
+    {
+        const program_name = $(pb).data("program-name");
+
+        if (running_program_name != null)
+        {
+            if (program_name == running_program_name)
+            {
+                set_play_stop_btn(program_name, true, false);
+            }
+            else
+            {
+                set_play_stop_btn(program_name, false, true);
+            }
+        }
+        else
+        {
+            set_play_stop_btn(program_name, false, false);
+        }
+    }
+}
+
+function poll_running_program()
+{
+    $.get(POST_RUNNING_PROGRAM, function(data, textStatus, jqXHR){
+        filter_status_response(jqXHR, function() {
+            running_program_name = data["name"];
+            update_play_stop_btns();
+        });
+    });
+}
 
 function set_play_stop_btn(program_name, running, disabled)
 {
@@ -301,11 +301,14 @@ function start_stop_clicked(program_name)
     const btn = play_stop_map[program_name];
     btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
 
-    if (program_name === running_program_name)
+    poll_running_program();
+
+    if (program_name == running_program_name)
     {
         $.post(POST_STOP_PROGRAM, function(data, textStatus, jqXHR){
             filter_status_response(jqXHR, function() {
                 console.log(`stopped ${program_name}`);
+                poll_running_program();
             });
         });
     }
@@ -317,29 +320,9 @@ function start_stop_clicked(program_name)
             $.post(path, function(data, textStatus, jqXHR){
                 filter_status_response(jqXHR, function() {
                     console.log(`started ${program_name}`);
+                    poll_running_program();
                 });
             });
-        }
-    }
-
-    update_play_stop_btns();
-}
-
-function update_play_stop_btns()
-{
-    running_program_name = get_running_program_name();
-
-    for (const pb of play_stop_btns)
-    {
-        const program_name = $(pb).data("program-name");
-
-        if (program_name === running_program_name)
-        {
-            set_play_stop_btn(program_name, true, false);
-        }
-        else
-        {
-            set_play_stop_btn(program_name, false, running_program_name != null);
         }
     }
 }
@@ -353,4 +336,4 @@ for (const pb of play_stop_btns)
     });
 }
 
-update_play_stop_btns();
+poll_running_program();

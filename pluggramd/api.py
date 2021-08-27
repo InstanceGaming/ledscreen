@@ -26,6 +26,14 @@ class PluggramManager:
         return [m.name for m in self._metadata]
 
     @public
+    def get_info(self, name: str) -> Optional[Tuple[str,
+                                                    Optional[str],
+                                                    Optional[str],
+                                                    Optional[int]]]:
+        m = self._find_by_name(name)
+        return m.display_name, m.description, m.version, m.tick_rate
+
+    @public
     def get_options(self, name: str) -> List[Tuple[str,
                                                    str,
                                                    List,
@@ -52,8 +60,9 @@ class PluggramManager:
         return data
 
     @public
-    def save_options(self, name: str, options: dict) -> Tuple[List[str], bool]:
-        return [], False
+    def save_options(self, name: str, options: dict) -> List[str]:
+        m = self._find_by_name(name)
+        return list(m.save_options(options))
 
     @public
     def get_running(self) -> Optional[str]:
@@ -62,9 +71,14 @@ class PluggramManager:
         return None
 
     @public
-    def start(self, name: str):
+    def start(self, name: str) -> bool:
         metadata = self._find_by_name(name)
-        self._runner.start(metadata, self._screen_url)
+        running_name = self.get_running()
+        if running_name is None or metadata.name != running_name:
+            self._runner.start(metadata, self._screen_url)
+            return True
+        else:
+            return False
 
     @public
     def stop(self) -> bool:
