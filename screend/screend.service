@@ -1,0 +1,11 @@
+[Unit]
+Description=Screen controller daemon for the LED screen web service
+
+[Service]
+Type=forking
+ExecStart=/opt/screend/run.sh
+ExecStop=/opt/screend/stop.sh
+Restart=always
+
+[Install]
+WantedBy=basic.target

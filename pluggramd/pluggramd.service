@@ -1,0 +1,11 @@
+[Unit]
+Description=Built-in program daemon for LED screen web service
+
+[Service]
+Type=forking
+ExecStart=/opt/pluggramd/run.sh
+ExecStop/opt/pluggramd/stop.sh
+Restart=always
+
+[Install]
+WantedBy=basic.target

@@ -1,0 +1,29 @@
+http {
+    server_tokens       off;
+}
+
+server {
+    listen              80;
+    server_name         ledscreen;
+
+    location / {
+        include         uwsgi_params;
+        uwsgi_pass      unix:/var/www/webapp/webapp.sock;
+    }
+
+    location /static/ {
+        gzip_static     on;
+        expires         7d;
+        add_header      Cache-Control public;
+        alias           /var/www/webapp/static/;
+    }
+
+    location /favicon.ico {
+        access_log      off;
+        gzip_static     on;
+        add_header      Cache-Control public;
+        tcp_nodelay     off;
+        expires         max;
+        alias           /var/www/webapp/static/favicon.ico;
+    }
+}
