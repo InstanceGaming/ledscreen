@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-screen -S pluggramd env/bin/python main.py programs tcp://localhost:5555 tcp://localhost:5556
+./env/bin/python -OO main.py programs tcp://127.0.0.1:9998 tcp://127.0.0.1:9999

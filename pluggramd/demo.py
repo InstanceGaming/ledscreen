@@ -1,12 +1,12 @@
 import os
-import api
+import rpc
 import zmq
 import json
 import argparse
 import traceback
 from utils import timing_counter
 from tinyrpc import RPCClient
-from pluggram import load
+from pluggram import load, load_type
 from tinyrpc.transports.zmq import ZmqClientTransport
 from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
 
@@ -58,24 +58,22 @@ if __name__ == '__main__':
     )
 
     proxy_obj = client.get_proxy()
-    screen = api.Screen(proxy_obj)
+    screen = rpc.Screen(proxy_obj)
 
     if frames_dir is not None:
         if not os.path.isdir(frames_dir):
             print('Frame output path does not exist or is not a directory')
             exit(2)
 
-    metas, klass_objects = load('programs', 1)
+    metas = load('programs', 1)
     print(f'loaded {len(metas)} pluggrams')
 
     if len(metas) > 0:
         pgm = None
-        pgc = None
         selection_name = module_name.lower().strip()
-        for pg, pc in zip(metas, klass_objects):
+        for pg in metas:
             if pg.name == selection_name:
                 pgm = pg
-                pgc = pc
                 break
         else:
             print(f'"{selection_name}" not found or was disqualified')
@@ -95,10 +93,11 @@ if __name__ == '__main__':
             print(f'loaded user preferences')
 
         try:
-            instance = pgm.init(pgc, screen)
+            klass_name, klass = load_type(pgm.module_path)
+            instance = klass(screen, **pgm.get_filled_options())
         except Exception as e:
             print(f'exception {e.__class__.__name__} initializing pluggram '
-                  f'"{pgm.name}" ({pgm.class_name}): {str(e)}')
+                  f'"{pgm.name}" ({klass_name or "unknown"}): {str(e)}')
             print(traceback.format_exc())
             exit(100)
 

@@ -117,6 +117,14 @@ def validate_config(path: str, config: DottedDict):
     root.validate('frames_dir', str, optional=True, isdir=True)
 
 
+def get_ip_address(filter_if_name: str):
+    from netifaces import AF_INET, ifaddresses
+
+    interface = ifaddresses(filter_if_name)
+    protocol = interface[AF_INET]
+    return protocol[0]['addr']
+
+
 def pretty_ms(milliseconds):
     if milliseconds is not None:
         if milliseconds <= 1000:

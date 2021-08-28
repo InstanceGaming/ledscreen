@@ -61,6 +61,7 @@ def login():
                                 system.user_state.session_token,
                                 expires=system.user_state.expiration,
                                 samesite='Strict')
+            LOG.debug('created response auth cookie')
             return response
         else:
             default_mid = int(LoginMessage.BAD_PASSWORD)

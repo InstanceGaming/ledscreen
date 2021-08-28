@@ -2,9 +2,12 @@
 Description=Screen controller daemon for the LED screen web service
 
 [Service]
-Type=forking
+Type=simple
 ExecStart=/opt/screend/run.sh
-ExecStop=/opt/screend/stop.sh
+ExecReload=/bin/kill -1 -- $MAINPID
+ExecStop=/bin/kill -- $MAINPID
+KillMode=process
+WorkingDirectory=/opt/screend/
 Restart=always
 
 [Install]

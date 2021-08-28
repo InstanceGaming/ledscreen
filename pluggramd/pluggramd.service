@@ -1,10 +1,14 @@
 [Unit]
 Description=Built-in program daemon for LED screen web service
+Requires=screend.service
 
 [Service]
-Type=forking
+Type=simple
 ExecStart=/opt/pluggramd/run.sh
-ExecStop/opt/pluggramd/stop.sh
+ExecReload=/bin/kill -1 -- $MAINPID
+ExecStop=/bin/kill -- $MAINPID
+KillMode=process
+WorkingDirectory=/opt/pluggramd/
 Restart=always
 
 [Install]

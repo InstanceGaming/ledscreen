@@ -5,7 +5,7 @@ import utils
 import logging
 import subprocess
 from flask import request
-from common import config, screen
+from common import config
 from typing import Optional
 from datetime import datetime, timedelta
 
@@ -94,33 +94,15 @@ def is_user_authenticated() -> bool:
 
 
 def shutdown():
-    screen.clear()
-    screen.set_font('default')
-    screen.draw_text((0, 0),
-                     0x0000FF,
-                     'Poweroff',
-                     anchor='lt',
-                     alignment='left')
-
     if os.name == 'posix':
-        args = ['poweroff']
         LOG.info(f'shutting down...')
-        proc = subprocess.Popen(args)
-        return_code = proc.wait(2)
-        LOG.debug(f'poweroff return-code {return_code}')
+        proc = subprocess.Popen(['poweroff'])
+        proc.wait()
     else:
         raise NotImplementedError('Intentionally left unimplemented')
 
 
 def restart():
-    screen.clear()
-    screen.set_font('default')
-    screen.draw_text((0, 0),
-                     0x00FFFF,
-                     'Restart',
-                     anchor='lt',
-                     alignment='left')
-
     if os.name == 'posix':
         LOG.info(f'restarting...')
         proc = subprocess.Popen(['reboot'])

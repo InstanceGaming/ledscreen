@@ -2,8 +2,6 @@ import io
 import utils
 from enum import IntFlag
 from typing import List, Tuple, Union, Optional
-from functools import lru_cache
-from PIL.Image import Image
 from threading import Lock
 from dataclasses import dataclass
 
@@ -46,7 +44,7 @@ class Screen:
         self._rpc = rpc_proxy
 
     def paste(self,
-              img: Image,
+              img,
               box=None,
               fmt='png'):
         output = io.BytesIO()
@@ -216,14 +214,12 @@ class PluggramManager:
     def _unlock(self):
         self._lk.release()
 
-    @lru_cache
     def get_names(self) -> List[str]:
         self._lock()
         rv = self._rpc.get_names()
         self._unlock()
         return rv
 
-    @lru_cache(maxsize=10)
     def get_info(self, name: str, options=False) -> Optional[PluggramInfo]:
         self._lock()
         display_name, description, version, tick_rate = self._rpc.get_info(name)

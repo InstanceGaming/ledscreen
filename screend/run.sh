@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-screen -S screend env/bin/python main.py -c screen.toml tcp://localhost:5555
+./env/bin/python -OO main.py -c screen.toml tcp://127.0.0.1:9998

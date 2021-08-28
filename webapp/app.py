@@ -4,7 +4,6 @@ import flask
 import common
 import signal
 import logging
-import netutils
 from utils import (load_config,
                    get_config_path,
                    validate_config,
@@ -27,19 +26,10 @@ def create_app():
     LOG.info(f'loaded application config')
 
     context = zmq.Context()
-    screen_client = RPCClient(
-        MSGPACKRPCProtocol(),
-        ZmqClientTransport.create(context, conf['app.screen_url'])
-    )
-    screen_proxy = screen_client.get_proxy()
-    scr = rpc.Screen(screen_proxy)
-    scr.reset_frame_count()
-
-    LOG.info(f'started screen RPC client')
 
     pluggram_client = RPCClient(
         MSGPACKRPCProtocol(),
-        ZmqClientTransport.create(context, conf['app.pluggram_url'])
+        ZmqClientTransport.create(context, conf['app.pluggramd_url'])
     )
     pluggram_proxy = pluggram_client.get_proxy()
     plugman = rpc.PluggramManager(pluggram_proxy)
@@ -52,7 +42,6 @@ def create_app():
     LOG.debug('initialized flask')
 
     common.config = conf
-    common.screen = scr
     common.pluggram_manager = plugman
 
     from routes import endpoints, management, authentication
@@ -65,45 +54,6 @@ def create_app():
     if conf['app.minification']:
         LOG.debug('minification enabled')
         minify(app)
-
-    ip_addr = None
-    try:
-        ip_addr = netutils.get_ip_address(conf['server.iface'])
-    except Exception as e:
-        LOG.warning(f'failed to get IPv4 address: {str(e)}')
-
-    scr.clear()
-    scr.set_font('slkscr.ttf', 9)
-    scr.draw_text(0,
-                  0,
-                  0xFFFFFF,
-                  f'V{VERSION}',
-                  anchor='lt',
-                  alignment='left')
-    scr.draw_text(scr.width,
-                  0,
-                  0xFFFFFF,
-                  'JLJ',
-                  anchor='rt',
-                  alignment='right')
-    if ip_addr is not None:
-        parts = ip_addr.split('.')
-
-        for i, part in enumerate(parts, start=1):
-            scr.draw_text(0,
-                          6 * i,
-                          0x00FFFF,
-                          (part if i == len(parts) else f'{part}.'),
-                          anchor='lt',
-                          alignment='left')
-    else:
-        scr.draw_text(0,
-                      6,
-                      0x0000FF,
-                      'BAD IFN',
-                      'lt',
-                      'left')
-    scr.render()
 
     return app
 

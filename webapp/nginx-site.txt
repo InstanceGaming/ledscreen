@@ -1,10 +1,7 @@
-http {
-    server_tokens       off;
-}
-
 server {
     listen              80;
     server_name         ledscreen;
+    error_page 502 =200 /e502;
 
     location / {
         include         uwsgi_params;
@@ -25,5 +22,10 @@ server {
         tcp_nodelay     off;
         expires         max;
         alias           /var/www/webapp/static/favicon.ico;
+    }
+
+    location /e502 {
+        add_header Content-Type text/plain;
+        return 200 "The web application failed to start. Please restart the system. If the issue persists, contact Jacob.";
     }
 }

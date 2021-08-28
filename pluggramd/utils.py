@@ -1,4 +1,3 @@
-import os
 import time
 import logging
 
@@ -48,13 +47,6 @@ def pretty_timedelta(td, prefix=None, format_spec=None):
 
 def get_key_display_name(key: str):
     return key.replace('_', ' ').capitalize()
-
-
-def canonical_filename(directory: str, name: str):
-    for file in os.listdir(directory):
-        if file.lower().strip() == name.lower().strip():
-            return file
-    return None
 
 
 def timing_counter():

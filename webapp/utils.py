@@ -86,6 +86,10 @@ class ConfigValidator:
 def load_config(path):
     config = None
 
+    if path is None:
+        LOG.error(f'no configuration path found')
+        exit(1)
+
     if os.path.isfile(path):
         try:
             with open(path, 'r') as cf:
@@ -109,19 +113,15 @@ def validate_config(path: str, config: DottedDict):
     server = root.addValidator('server')
     server.validate('host', str)
     server.validate('port', int)
-    server.validate('iface', str)
 
     app = root.addValidator('app')
     app.validate('secret', str)
-    app.validate('programs_dir', str)
     app.validate('minification', bool)
     app.validate('api_keys', DottedList)
     app.validate('max_session_minutes', int)
-    app.validate('screen_url', str)
-    app.validate('pluggram_url', str)
+    app.validate('pluggramd_url', str)
 
     user = root.addValidator('user')
-    user.validate('name', str)
     user.validate('password', str)
 
 

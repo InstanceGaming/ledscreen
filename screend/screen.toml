@@ -9,3 +9,4 @@ inverted = false
 antialiasing = false
 fonts_dir = "fonts"
 frames_dir = "frames"
+iface = "eth0"

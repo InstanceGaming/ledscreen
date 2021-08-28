@@ -4,3 +4,4 @@ dotted
 zmq
 tinyrpc
 msgpack
+netifaces

@@ -1,0 +1,13 @@
+[Unit]
+Description=uWSGI LED screen web service
+Requires=screend.service pluggramd.service
+
+[Service]
+Type=simple
+PIDFile=/var/www/webapp/uwsgi.pid
+ExecStart=/var/www/webapp/run.sh
+WorkingDirectory=/var/www/webapp/
+Restart=always
+
+[Install]
+WantedBy=networking.target

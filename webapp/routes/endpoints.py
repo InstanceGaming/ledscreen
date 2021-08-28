@@ -1,10 +1,9 @@
-from tinyrpc.protocols.msgpackrpc import MSGPACKRPCError
-
 import system
 import logging
 from flask import Blueprint, request
-from common import config, screen, pluggram_manager
+from common import config, pluggram_manager
 from flask_restful import Api, Resource
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCError
 
 
 LOG = logging.getLogger('ledscreen.web.api')
@@ -103,9 +102,6 @@ class StopPluggram(Resource):
                 return {'message': message}, 500
 
             LOG.info(f'stopped {running_name}')
-
-            if clear:
-                screen.clear()
 
         return {'name': running_name}, 200
 
@@ -226,16 +222,6 @@ class Pluggrams(Resource):
 
 
 api.add_resource(Pluggrams, '/pluggrams')
-
-
-class Fonts(Resource):
-
-    def get(self):
-        names = screen.font_names()
-        return names, 200
-
-
-api.add_resource(Fonts, '/fonts')
 
 
 class SystemRestart(Resource):
