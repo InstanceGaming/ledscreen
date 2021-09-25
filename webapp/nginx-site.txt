@@ -5,14 +5,14 @@ server {
 
     location / {
         include         uwsgi_params;
-        uwsgi_pass      unix:/var/www/webapp/webapp.sock;
+        uwsgi_pass      unix:/home/pi/ledscreen/webapp/webapp.sock;
     }
 
     location /static/ {
         gzip_static     on;
         expires         7d;
         add_header      Cache-Control public;
-        alias           /var/www/webapp/static/;
+        alias           /home/pi/ledscreen/webapp/static/;
     }
 
     location /favicon.ico {
@@ -21,11 +21,11 @@ server {
         add_header      Cache-Control public;
         tcp_nodelay     off;
         expires         max;
-        alias           /var/www/webapp/static/favicon.ico;
+        alias           /home/pi/ledscreen/webapp/static/favicon.ico;
     }
 
     location /e502 {
         add_header Content-Type text/plain;
-        return 200 "The web application failed to start. Please restart the system. If the issue persists, contact Jacob.";
+        return 200 "The web application failed to start. Please power cycle the system. If the issue persists, contact Jacob.";
     }
 }

@@ -4,12 +4,9 @@ Requires=screend.service
 
 [Service]
 Type=simple
-ExecStart=/opt/pluggramd/run.sh
-ExecReload=/bin/kill -1 -- $MAINPID
-ExecStop=/bin/kill -- $MAINPID
-KillMode=process
-WorkingDirectory=/opt/pluggramd/
+ExecStart=/home/pi/ledscreen/pluggramd/run.sh
+WorkingDirectory=/home/pi/ledscreen/pluggramd/
 Restart=always
 
 [Install]
-WantedBy=basic.target
+WantedBy=networking.target

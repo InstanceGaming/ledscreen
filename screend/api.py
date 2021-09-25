@@ -73,6 +73,17 @@ class Screen:
                  fonts_dir: str,
                  antialiasing=False,
                  frames_dir=None):
+        assert isinstance(w, int)
+        assert isinstance(h, int)
+        assert isinstance(output_pin, int)
+        assert isinstance(frequency, int)
+        assert isinstance(dma_channel, int)
+        assert isinstance(max_brightness, int)
+        assert isinstance(invert_signal, bool)
+        assert isinstance(gpio_channel, int)
+        assert isinstance(fonts_dir, str)
+        assert isinstance(antialiasing, bool)
+
         super().__init__()
         self.LOG = logging.getLogger('screend.api')
         utils.configure_logger(self.LOG)

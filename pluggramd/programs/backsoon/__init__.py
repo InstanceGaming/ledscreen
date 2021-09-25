@@ -15,7 +15,7 @@ class BackSoon(Pluggram):
         Option('foreground', 0xFFFFFF, min=0, max=0xFFFFFF, color_picker=True),
         Option('background', 0, min=0, max=0xFFFFFF, color_picker=True)
     ]
-    FONT = 'slkscr.ttf'
+    FONT = 'arial.ttf'
 
     def __init__(self,
                  screen: Screen,

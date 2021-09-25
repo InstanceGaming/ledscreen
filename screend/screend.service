@@ -3,12 +3,9 @@ Description=Screen controller daemon for the LED screen web service
 
 [Service]
 Type=simple
-ExecStart=/opt/screend/run.sh
-ExecReload=/bin/kill -1 -- $MAINPID
-ExecStop=/bin/kill -- $MAINPID
-KillMode=process
-WorkingDirectory=/opt/screend/
+ExecStart=/home/pi/ledscreen/screend/run.sh
+WorkingDirectory=/home/pi/ledscreen/screend/
 Restart=always
 
 [Install]
-WantedBy=basic.target
+WantedBy=networking.target

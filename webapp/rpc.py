@@ -1,9 +1,14 @@
 import io
-import utils
 from enum import IntFlag
 from typing import List, Tuple, Union, Optional
 from threading import Lock
 from dataclasses import dataclass
+
+from zmq import Context
+
+
+def get_key_display_name(key: str):
+    return key.replace('_', ' ').capitalize()
 
 
 class Screen:
@@ -175,7 +180,7 @@ class Option:
 
     @property
     def display_name(self):
-        return utils.get_key_display_name(self.name)
+        return get_key_display_name(self.name)
 
     @property
     def markup_id(self):
@@ -184,11 +189,7 @@ class Option:
     @property
     def rgb_color(self):
         if self.type_name == 'INT':
-            bgr = self.value
-            r = bgr & 0xFF
-            g = (bgr >> 8) & 0xFF
-            b = (bgr >> 16) & 0xFF
-            return (r << 16) | (g << 8) | b
+            return self.value
         return None
 
 
@@ -204,7 +205,8 @@ class PluggramInfo:
 
 class PluggramManager:
 
-    def __init__(self, rpc_proxy):
+    def __init__(self, zmq_context: Context, rpc_proxy):
+        self._zmq_context = zmq_context
         self._rpc = rpc_proxy
         self._lk: Lock = Lock()
 
@@ -225,21 +227,14 @@ class PluggramManager:
         display_name, description, version, tick_rate = self._rpc.get_info(name)
         self._unlock()
 
-        if not options:
-            return PluggramInfo(name,
-                                display_name,
-                                description,
-                                version,
-                                tick_rate,
-                                None)
-        else:
-            opts = self.get_options(name)
-            return PluggramInfo(name,
-                                display_name,
-                                description,
-                                version,
-                                tick_rate,
-                                opts)
+        opts = self.get_options(name) if options else None
+
+        return PluggramInfo(name,
+                            display_name,
+                            description,
+                            version,
+                            tick_rate,
+                            opts)
 
     def get_options(self, name: str) -> List[Option]:
         options = []

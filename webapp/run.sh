@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-./env/bin/uwsgi /var/www/webapp/app.ini
+./env/bin/uwsgi /home/pi/ledscreen/webapp/app.ini

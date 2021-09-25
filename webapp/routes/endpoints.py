@@ -174,8 +174,7 @@ class RunningPluggram(Resource):
         try:
             running_name = pluggram_manager.get_running()
         except MSGPACKRPCError as e:
-            message = e.message if e.message is not None else None
-            return {'message': message}, 500
+            return {'message': e.message}, 500
 
         return {'name': running_name}, 200
 

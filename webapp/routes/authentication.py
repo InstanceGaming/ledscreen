@@ -32,9 +32,7 @@ def auth_or_login():
 @bp.route('/logout', methods=['GET'])
 def logout():
     system.user_state.logout()
-
-    # default
-    return render_template('pages/login.html', mid=int(LoginMessage.LOGGED_OUT))
+    return redirect(url_for('auth.login', mid=int(LoginMessage.LOGGED_OUT)))
 
 
 @bp.route('/', methods=['GET', 'POST'])
@@ -49,14 +47,12 @@ def login():
             LOG.debug('non-integer value passed as MID parameter')
             default_mid = None
 
-    if system.is_user_authenticated():
-        return redirect(url_for('manage.index'))
-
     if request.method == 'POST':
         password = request.form.get('password')
 
         if system.authenticate_user(password):
-            response = make_response(redirect(url_for('manage.index')))
+            response = make_response(redirect(url_for('manage.index'),
+                                              code=303))
             response.set_cookie(system.AUTH_COOKIE_NAME,
                                 system.user_state.session_token,
                                 expires=system.user_state.expiration,
@@ -65,6 +61,9 @@ def login():
             return response
         else:
             default_mid = int(LoginMessage.BAD_PASSWORD)
+    else:
+        if system.is_user_authenticated():
+            return redirect(url_for('manage.index'))
 
     # default
     return render_template('pages/login.html', mid=default_mid)

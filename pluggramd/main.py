@@ -41,7 +41,7 @@ if __name__ == '__main__':
         try:
             md.load_options()
         except OSError as e:
-            LOG.warning(f'failed to open user options store for "{md.name}"')
+            LOG.info(f'did not load user options from file for "{md.name}"')
         except json.JSONDecodeError as e:
             LOG.warning(f'failed to parse user options store for "{md.name}"')
 

@@ -13,8 +13,14 @@ def index():
     auth_or_login()
     programs = []
 
-    for name in pluggram_manager.get_names():
+    LOG.debug(f'requesting program info for management page...')
+    names = pluggram_manager.get_names()
+    LOG.debug(f'got list of {len(names)} pluggram names')
+
+    for name in names:
+        LOG.debug(f'retrieving info for "{name}"')
         info = pluggram_manager.get_info(name, options=True)
+        LOG.debug(f'retrieved program info for "{name}"')
         programs.append(info)
 
     return render_template('pages/manage.html', programs=programs)

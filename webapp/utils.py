@@ -29,10 +29,6 @@ def configure_logger(log):
     log.addHandler(handler)
 
 
-def get_key_display_name(key: str):
-    return key.replace('_', ' ').capitalize()
-
-
 def get_config_path():
     return os.environ.get('APP_CONFIG')
 

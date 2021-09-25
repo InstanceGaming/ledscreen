@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <title>Manage</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/icon-font/bootstrap-icons.css">
     <link rel="stylesheet" href="/static/css/iziToast.min.css">
     <script src="/static/js/jquery.min.js"></script>
     <script src="/static/js/bootstrap.bundle.min.js"></script>
@@ -72,6 +72,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                {% if program.options %}
                 <form action="#">
                     {% for opt in program.options %}
                         {% if opt.type_name == 'INT' %}
@@ -158,6 +159,9 @@
                         {% endif %}
                     {% endfor %}
                 </form>
+                {% else %}
+                <p class="text-center"><i>No options found for this program.</i></p>
+                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -225,7 +229,7 @@
                                         <td>
                                             <div class="btn-group float-end" role="group"
                                                  aria-label="Program row actions">
-                                                {% if program.options|length > 0 %}
+                                                {% if program.options %}
                                                 <button type="button" class="btn btn-outline-primary"
                                                         data-bs-toggle="modal"
                                                         data-bs-target="#settings-modal-{{ program.name }}"

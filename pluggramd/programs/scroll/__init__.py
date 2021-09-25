@@ -13,7 +13,7 @@ class ScrollingText(Pluggram):
     OPTIONS = [
         Option('brightness', 128, min=1, max=190),
         Option('message', 'Computer science rocks!', min=1),
-        Option('font', 'slkscr.ttf', min=5,
+        Option('font', 'arial.ttf', min=5,
                help='What TrueType font face to load from file. (.ttf)'),
         Option('start_delay', 1000, min=0, help='Wait this many milliseconds before scrolling.'),
         Option('font_size', 17, min=6, max=60),

@@ -32,7 +32,7 @@ def startup_banner(scr: Screen, cnf):
                   'left',
                   None,
                   None)
-    scr.draw_text(scr.width(),
+    scr.draw_text(scr.width() - 1,
                   0,
                   0xFFFFFF,
                   'JLJ',

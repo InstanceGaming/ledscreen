@@ -329,7 +329,8 @@ class PluggramMetadata:
         return updated_keys, unmapped_keys
 
     def load_options(self):
-        LOG.info(f'loading user options for {self.name}')
+        LOG.debug(f'loading "{self.name}" user '
+                  f'options from "{self._store_path}"')
 
         with open(self._store_path, 'r') as sf:
             root_node: dict = json.load(sf)
@@ -376,7 +377,7 @@ def load_type(module_path: str) -> Tuple[str, type]:
     for file in os.listdir(module_path):
         if file == '__init__.py':
             init_path = os.path.join(module_path, file)
-            LOG.info(f'load_type("{module_path}"): found module {module_name}')
+            LOG.debug(f'load_type("{module_path}"): found module {module_name}')
 
             spec = importlib.util.spec_from_file_location(module_name,
                                                           init_path)
@@ -512,9 +513,8 @@ def load_one(module_path: str, argument_count: int) -> \
                                     version_text,
                                     options=option_definitions)
 
-            LOG.info(
-                f'load_one("{module_path}", {argument_count}): '
-                f'loaded pluggram {class_name}')
+            LOG.debug(f'load_one("{module_path}", {argument_count}): '
+                      f'loaded pluggram {class_name}')
             break
 
     return meta
@@ -527,7 +527,8 @@ def load(programs_dir: str, argument_count):
 
     pluggram_metas = []
 
-    for _, dirs, _ in os.walk(programs_dir, topdown=True, followlinks=False):
+    for _, dirs, _ in os.walk(programs_dir, followlinks=False):
+        dirs.sort()
         for module_name in dirs:
             module_path = os.path.abspath(
                 os.path.join(programs_dir, module_name))

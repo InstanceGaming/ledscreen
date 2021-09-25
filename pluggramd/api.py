@@ -1,6 +1,5 @@
 from typing import List, Tuple, Union, Optional
 from pluggram import PluggramRunner, PluggramMetadata
-from functools import lru_cache
 from tinyrpc.dispatch import public
 
 
@@ -13,7 +12,6 @@ class PluggramManager:
         self._screen_url = screen_url
         self._runner = PluggramRunner()
 
-    @lru_cache(maxsize=10)
     def _find_by_name(self, name: str) -> PluggramMetadata:
         for m in self._metadata:
             if m.name == name:

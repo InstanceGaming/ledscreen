@@ -19,22 +19,30 @@ LOG = logging.getLogger('ledscreen')
 configure_logger(LOG)
 
 
+zmq_context = zmq.Context()
+
+
 def create_app():
+    global zmq_context
+
     config_path = get_config_path()
     conf = load_config(config_path)
     validate_config(config_path, conf)
     LOG.info(f'loaded application config')
 
-    context = zmq.Context()
-
     pluggram_client = RPCClient(
         MSGPACKRPCProtocol(),
-        ZmqClientTransport.create(context, conf['app.pluggramd_url'])
+        ZmqClientTransport.create(zmq_context, conf['app.pluggramd_url'])
     )
     pluggram_proxy = pluggram_client.get_proxy()
-    plugman = rpc.PluggramManager(pluggram_proxy)
+    plugman = rpc.PluggramManager(zmq_context, pluggram_proxy)
 
     LOG.info(f'started pluggram RPC client')
+
+    LOG.debug('RPC sanity check 1 of 2...')
+    plugman.get_names()
+    LOG.debug('RPC sanity check 2 of 2...')
+    plugman.get_running()
 
     app = flask.Flask(__name__)
     app.url_map.strict_slashes = False
