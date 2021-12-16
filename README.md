@@ -1,9 +1,20 @@
-# ledscreen
+_Updated 12/15/21_
 
+# ledscreen
 This Python project is designed to control a 1944-pixel WS2813 LED screen in a classroom environment.
 
-## To run
+### This is NOT finished software!
 
+**For the time being, only the built-in program start, stop and option edit functionality is implemented, others will come in due time.**
+
+## Known issues
+- Running the Flask app with uWSGI makes tinyrpc hang upon first RPC call but dev server does not. I'm out of ideas on how to dignose this issue.
+- It seems like dhcpcd takes at least 10sec to setup even just a static address, so a 10 second delay must happen before screend starts or else the startup splash will not be able to show the devices address. Linux only.
+- Oversimplified user authentication for a single user account (for my particular use case).
+- Pluggram option modals do not show descriptive error for invalid input.
+- As it turns out, trying to drive all 1944 pixels from one DMA channel has its quirks. If you are building a WS28XX screen, please heed my advice: use multiple GPIO outputs to drive segments of your screen (it's a bit late in the design process for me). Even though it's only 800kHz, use copious amounts of shielding on data lines, RS485 if you have to. Order at least one spare roll of LED strip, there WILL be dead pixels! Try to order all the LED rolls from the same vendor **at the same time**. There is no guarantee that they will make more of the same specification or quality.
+
+## To run
 - Install Python >3.6 and `virtualenv` or equivalent.
 - Make virtual environments for each of the above modules.
 - Run `pip install -r requirements.txt` for each module in their respective virtual environments.
@@ -14,28 +25,25 @@ This Python project is designed to control a 1944-pixel WS2813 LED screen in a c
 
 For all three entry scripts, use the argument `-h` or `--help` by itself to read the complete list of available command line arguments.
 
-**For the time being, only the built-in program start, stop and option edit functionality is implemented, others will come in due time. The information below is what the final version will encompass.**
+## Client-side
+A well-documented, easy-to-use Python pseudo-module that students can write code around. Under the hood, the API just makes IPC calls over zeroMQ to the running screen daemon.
 
-## Client
-
-A well-documented, easy-to-use psudo-libary that students will interface with. Under the hood, the API just makes IPC calls over zeroMQ to the running daemon.
-
-## Daemon
-
-The main control system for the screen will have many responsibilities:
-
-- Running student code from a browser
-- Serving web requests
-- Seemless IPC
-- Database connections and setup
-- Plugin-like Python scripts ("built-in programs")
-- All-in-one-place management portal for teachers
+## screend
 - Driving the LED screen via the `rpi_ws2812` libary.
+- Wrapping PIL for easier image and font manipulation.
+- Showing splash image upon startup of the devices current IP address (interface set in `screend.toml`).
+
+## pluggramd
+- Loading, configuring, running "built-in programs".
+- Interfaces with both screend and webapp over IPC.
+
+"Built-in program" is just a friendlier name for a plugin framework, like JAR plugins.
+These plugin scripts can be found or added under `pluggramd/programs/`.
+
+## webapp
+The Flask frontend web service and REST API to make IPC calls to pluggramd.
 
 ## Concept
+This system is meant to run headless on a Raspberry Pi or other linux device to provide a useful computer science teaching tool in the classroom by driving a 1944 (54x36) pseudo-"screen" display.
 
-This system is meant to run headless on a Raspberry Pi or other linux device to provide a useful computer science teaching tool in the classroom.
-
-The idea is a instructor can login to the management portal, create a roster of student "codes" (an 8-digit random alphanumeric value), and have their students use this system to explore graphics programming in Python in a simplified and ideal environment while promoting critical thinking and lightning-fast prototyping. Each student can login to the system using their assigned code to continue to iterate over their program as they learn the language and concepts of programming itself.
-
-When the student has written and syntax-checked their code, within two clicks, they're code will run live on the big screen to produce immediate, definitive feedback for what they just wrote (which, in my opinion, is critical for learning developers). Teachers have the ability to monitor and selectively allow students to run code either on the physical screen or with a dummy library.
+The class instructor can run built-in graphical programs or (eventually) allow students to write Python to run on the screen from over the network by uploading their code to the screen for sandboxed execution.

@@ -35,7 +35,7 @@ def create_app():
         ZmqClientTransport.create(zmq_context, conf['app.pluggramd_url'])
     )
     pluggram_proxy = pluggram_client.get_proxy()
-    plugman = rpc.PluggramManager(zmq_context, pluggram_proxy)
+    plugman = rpc.PluggramManager(pluggram_proxy)
 
     LOG.info(f'started pluggram RPC client')
 

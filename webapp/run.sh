@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-./env/bin/uwsgi /home/pi/ledscreen/webapp/app.ini
+APP_CONFIG=app.toml
+export APP_CONFIG
+./env/bin/python /home/pi/ledscreen/webapp/app.py

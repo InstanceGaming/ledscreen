@@ -1,5 +1,6 @@
 width = 54
 height = 36
+# DO NOT EXCEED 190. WILL BLOW BUS FUSES.
 max_brightness = 190
 frequency = 800000
 dma_channel = 10
@@ -8,5 +9,6 @@ gpio_channel = 0
 inverted = false
 antialiasing = false
 fonts_dir = "fonts"
+# uncomment next line to draw frames to file in directory "frames"
 frames_dir = "frames"
 iface = "eth0"

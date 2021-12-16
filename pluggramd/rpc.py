@@ -1,10 +1,21 @@
 import io
+import zmq
 from enum import IntFlag
 from typing import List, Tuple, Union, Optional
+from tinyrpc import RPCClient
 from threading import Lock
 from dataclasses import dataclass
+from tinyrpc.transports.zmq import ZmqClientTransport
+from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
 
-from zmq import Context
+
+def rpc_get_screen(screen_url: str, context=zmq.Context()):
+    client = RPCClient(
+        MSGPACKRPCProtocol(),
+        ZmqClientTransport.create(context, screen_url)
+    )
+    proxy = client.get_proxy()
+    return Screen(proxy)
 
 
 def get_key_display_name(key: str):
@@ -35,6 +46,7 @@ class Screen:
 
     @antialiasing.setter
     def antialiasing(self, v):
+        # todo: broken? method not found but it does exist???
         self._rpc.set_antialiasing(v)
 
     @property
@@ -205,8 +217,7 @@ class PluggramInfo:
 
 class PluggramManager:
 
-    def __init__(self, zmq_context: Context, rpc_proxy):
-        self._zmq_context = zmq_context
+    def __init__(self, rpc_proxy):
         self._rpc = rpc_proxy
         self._lk: Lock = Lock()
 
@@ -284,8 +295,8 @@ class PluggramManager:
         self._unlock()
         return rv
 
-    def stop(self) -> bool:
+    def stop(self, clear: bool) -> bool:
         self._lock()
-        rv = self._rpc.stop()
+        rv = self._rpc.stop(clear)
         self._unlock()
         return rv

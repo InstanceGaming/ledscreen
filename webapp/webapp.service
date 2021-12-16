@@ -1,0 +1,13 @@
+[Unit]
+Description=LED screen web dev webserver
+After=pluggramd.service
+Requires=pluggramd.service screend.service networking.service
+
+[Service]
+Type=simple
+ExecStart=/home/pi/ledscreen/webapp/run.sh
+WorkingDirectory=/home/pi/ledscreen/webapp/
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

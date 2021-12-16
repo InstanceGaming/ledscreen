@@ -81,5 +81,5 @@ class PluggramManager:
             return False
 
     @public
-    def stop(self) -> bool:
-        return self._runner.stop()
+    def stop(self, clear: bool) -> bool:
+        return self._runner.stop(clear)

@@ -59,7 +59,7 @@ class WallClock(Pluggram):
         # format time
         colon = (":" if self._flasher else " ")
         second_text = f'{colon}%S' if self._show_seconds else ""
-        date_text = now.strftime('%A\n%b %m')
+        date_text = now.strftime('%A\n%b %d')
         time_text = now.strftime(f'%I{colon}%M{second_text}')
 
         center = self._screen.center

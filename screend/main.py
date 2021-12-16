@@ -9,7 +9,7 @@ from tinyrpc.transports.zmq import ZmqServerTransport
 from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
 
 
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 LOG = logging.Logger('screend')
 utils.configure_logger(LOG)
 

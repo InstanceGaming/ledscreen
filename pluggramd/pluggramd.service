@@ -1,5 +1,6 @@
 [Unit]
-Description=Built-in program daemon for LED screen web service
+Description=Built-in program daemon for LED screen
+After=screend.service
 Requires=screend.service
 
 [Service]
@@ -9,4 +10,4 @@ WorkingDirectory=/home/pi/ledscreen/pluggramd/
 Restart=always
 
 [Install]
-WantedBy=networking.target
+WantedBy=multi-user.target

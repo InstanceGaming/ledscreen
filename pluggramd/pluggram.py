@@ -12,11 +12,7 @@ from rpc import InputMethod
 from utils import timing_counter, configure_logger
 from typing import List, Tuple, Optional
 from inspect import Parameter
-from tinyrpc import RPCClient
-from collections import KeysView
 from multiprocessing import Event, Process
-from tinyrpc.transports.zmq import ZmqClientTransport
-from tinyrpc.protocols.msgpackrpc import MSGPACKRPCProtocol
 
 
 LOG = logging.getLogger('pluggramd.internal')
@@ -347,7 +343,7 @@ class PluggramMetadata:
                                 f'from file, using default value')
                             continue
                         LOG.info(
-                            f'using user provided value for field "{key}"')
+                            f'using user-provided value for field "{key}"')
                     break
 
         LOG.info(f'loaded {self.name} user options')
@@ -561,13 +557,7 @@ def runner_process(module_path: str,
 
     if not abort:
         # start screen RPC client
-        context = zmq.Context()
-        screen_client = RPCClient(
-            MSGPACKRPCProtocol(),
-            ZmqClientTransport.create(context, screen_url)
-        )
-        screen_proxy = screen_client.get_proxy()
-        screen = rpc.Screen(screen_proxy)
+        screen = rpc.rpc_get_screen(screen_url)
 
         try:
             instance = live_type(screen, **filled_options)
@@ -576,7 +566,8 @@ def runner_process(module_path: str,
                       f'"{module_name}": {str(e)}')
             LOG.error(traceback.format_exc())
             abort = True
-            exception_screen(screen, 'INIT\nEXP')
+
+            exception_screen(screen, 'INIT\nEXC')
 
         if not abort:
             marker = -tick_rate if tick_rate is not None else timing_counter()
@@ -604,6 +595,10 @@ class PluggramRunner:
         return self._meta
 
     @property
+    def context(self):
+        return self._context
+
+    @property
     def is_running(self):
         return self._meta is not None and self._proc is not None and \
                self._proc.is_alive()
@@ -614,13 +609,15 @@ class PluggramRunner:
 
     def __init__(self):
         self._proc = None
-        self._meta = None
+        self._meta: PluggramMetadata = None
+        self._screen_url: Optional[str] = None
         self._event_stop = Event()
 
     def start(self, meta: PluggramMetadata, screen_url: str):
         self.stop()
         self._event_stop.clear()
         self._meta = meta
+        self._screen_url = screen_url
         filled_options = meta.get_filled_options()
 
         LOG.info(f'starting pluggram worker for program {self._meta.name}')
@@ -633,12 +630,19 @@ class PluggramRunner:
         self._proc.start()
         LOG.info(f'started pluggram worker for program {self._meta.name}')
 
-    def stop(self):
+    def stop(self, clear=False):
         LOG.info('stopping pluggram worker')
         if self.is_running:
             self._event_stop.set()
             self._proc.join()
-            self._meta = None
             LOG.info('stopped pluggram worker')
+
+            if clear and self._screen_url is not None:
+                screen = rpc.rpc_get_screen(self._screen_url)
+                screen.clear()
+                screen.render()
+                LOG.info('cleared screen')
+
+            self._meta = None
             return True
         return False

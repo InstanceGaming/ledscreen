@@ -1,3 +1,5 @@
+import functools
+
 import system
 import logging
 from flask import Blueprint, request
@@ -27,11 +29,12 @@ def key_or_session():
         return False
 
 
+@functools.lru_cache(16)
 def get_query_pluggram_name(query_name: str):
     selected_name = None
 
     for pg in pluggram_manager.get_names():
-        if pg == query_name.lower().strip():
+        if pg.lower().strip() == query_name.lower().strip():
             selected_name = pg
             break
 
@@ -46,20 +49,18 @@ class RunPluggram(Resource):
 
         try:
             selected_name = get_query_pluggram_name(query_name)
-        except MSGPACKRPCError as e:
-            message = e.message if e.message is not None else None
-            return {'message': message}, 500
+        except MSGPACKRPCError:
+            return {'message': 'RPC call failed to get pluggram name'}, 500
 
         if selected_name is None:
             return {'query_name': query_name}, 404
         else:
-            LOG.info(f'requesting start of pluggram "{selected_name}"')
+            LOG.info(f'requesting startup of {selected_name}')
 
             try:
                 did_start = pluggram_manager.start(selected_name)
-            except MSGPACKRPCError as e:
-                message = e.message if e.message is not None else None
-                return {'message': message}, 500
+            except MSGPACKRPCError:
+                return {'message': 'RPC call failed to start pluggram'}, 500
 
             if did_start:
                 LOG.info(f'started pluggram "{selected_name}"')
@@ -88,18 +89,16 @@ class StopPluggram(Resource):
 
         try:
             running_name = pluggram_manager.get_running()
-        except MSGPACKRPCError as e:
-            message = e.message if e.message is not None else None
-            return {'message': message}, 500
+        except MSGPACKRPCError:
+            return {'message': 'RPC call failed get running pluggram name'}, 500
 
         if running_name:
             LOG.info(f'requesting stop of running pluggram')
 
             try:
-                pluggram_manager.stop()
-            except MSGPACKRPCError as e:
-                message = e.message if e.message is not None else None
-                return {'message': message}, 500
+                pluggram_manager.stop(clear)
+            except MSGPACKRPCError:
+                return {'message': 'RPC call failed to stop pluggram'}, 500
 
             LOG.info(f'stopped {running_name}')
 
@@ -117,9 +116,8 @@ class PluggramOptions(Resource):
 
         try:
             selected_name = get_query_pluggram_name(query_name)
-        except MSGPACKRPCError as e:
-            message = e.message if e.message is not None else None
-            return {'message': message}, 500
+        except MSGPACKRPCError:
+            return {'message': 'RPC call failed to get pluggram name'}, 500
 
         if selected_name is None:
             return {'query_name': query_name}, 404
@@ -128,9 +126,9 @@ class PluggramOptions(Resource):
 
             try:
                 options = pluggram_manager.get_options(selected_name)
-            except MSGPACKRPCError as e:
-                message = e.message if e.message is not None else None
-                return {'message': message}, 500
+            except MSGPACKRPCError:
+                return ({'message': 'RPC call failed to get pluggram options'},
+                        500)
 
             keys = [o.name for o in options]
 
@@ -155,9 +153,9 @@ class PluggramOptions(Resource):
                     selected_name, values)
                 display_name = pluggram_manager.get_info(
                     selected_name).display_name
-            except MSGPACKRPCError as e:
-                message = e.message if e.message is not None else None
-                return {'message': message}, 500
+            except MSGPACKRPCError:
+                return ({'message': 'RPC call failed to save pluggram '
+                                    'options'}, 500)
 
             return {'query_name': query_name,
                     'display_name': display_name,
@@ -213,9 +211,8 @@ class Pluggrams(Resource):
                     'options': options_node
                 }
                 payload.append(pluggram_node)
-        except MSGPACKRPCError as e:
-            message = e.message if e.message is not None else None
-            return {'message': message}, 500
+        except MSGPACKRPCError:
+            return {'message': 'RPC call failed to get pluggram options'}, 500
 
         return payload, 200
 

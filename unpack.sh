@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-unzip -u -aa -o ledscreen.zip -x **env/** screend/frames/**
+unzip -u -o ledscreen.zip -x **env/** screend/frames/**
+dos2unix **/*
 rm *.bat
-sudo chmod +x *.sh
+sudo chmod +x **/*.sh
 rm ledscreen.zip

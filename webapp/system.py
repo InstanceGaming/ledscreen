@@ -1,6 +1,8 @@
 import os
 import re
 import hmac
+import threading
+
 import utils
 import logging
 import subprocess
@@ -93,11 +95,20 @@ def is_user_authenticated() -> bool:
     return False
 
 
+def _shutdown_worker(restarting: bool):
+    letter = 'r' if restarting else 'P'
+    # cheap trick to ensure webserver has time to send a response
+    proc = subprocess.Popen([f'sleep 2 && /sbin/shutdown -{letter} now'],
+                            shell=True)
+    proc.wait()
+
+
 def shutdown():
     if os.name == 'posix':
         LOG.info(f'shutting down...')
-        proc = subprocess.Popen(['poweroff'])
-        proc.wait()
+        th = threading.Thread(target=_shutdown_worker, args=[False])
+        th.daemon = True
+        th.start()
     else:
         raise NotImplementedError('Intentionally left unimplemented')
 
@@ -105,7 +116,8 @@ def shutdown():
 def restart():
     if os.name == 'posix':
         LOG.info(f'restarting...')
-        proc = subprocess.Popen(['reboot'])
-        proc.wait()
+        th = threading.Thread(target=_shutdown_worker, args=[True])
+        th.daemon = True
+        th.start()
     else:
         raise NotImplementedError('Intentionally left unimplemented')

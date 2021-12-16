@@ -1,5 +1,6 @@
 [Unit]
 Description=Screen controller daemon for the LED screen web service
+After=networking.service dhcpcd.service
 
 [Service]
 Type=simple
@@ -8,4 +9,4 @@ WorkingDirectory=/home/pi/ledscreen/screend/
 Restart=always
 
 [Install]
-WantedBy=networking.target
+WantedBy=multi-user.target

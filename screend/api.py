@@ -10,11 +10,9 @@ from tinyrpc.dispatch import public
 
 try:
     import rpi_ws281x
-
     _LED_STRIP_CLASS = rpi_ws281x.PixelStrip
 except ModuleNotFoundError:
     from dummy_ws281x import DummyStrip
-
     _LED_STRIP_CLASS = DummyStrip
 
 
@@ -101,7 +99,7 @@ class Screen:
         self._painter = ImageDraw.Draw(self._canvas)
         self.antialiasing = antialiasing
         self._max_brightness = max_brightness
-        self._matrix = _LED_STRIP_CLASS(self.pixel_count,
+        self._matrix = _LED_STRIP_CLASS(self.pixel_count(),
                                         self._output_pin,
                                         frequency,
                                         dma_channel,
@@ -151,9 +149,7 @@ class Screen:
             raise ValueError('Brightness must be within range 0-255')
 
         if v > self._max_brightness:
-            raise RuntimeError('Too much current would be drawn with given'
-                               'global brightness amount, crashed to prevent '
-                               'blowing all the supply fuses')
+            raise RuntimeError('Too bright! Tried to exceed safety maximum')
 
         self._matrix.setBrightness(v)
         self.LOG.info('screen brightness changed ({})'.format(v))
@@ -163,8 +159,7 @@ class Screen:
                  name: str,
                  size: Optional[int],
                  font_face: Optional[int]) -> bool:
-        name = name.lower().strip()
-        unique_name = name
+        unique_name = name.lower().strip()
 
         if size is not None:
             assert isinstance(size, int)
@@ -177,7 +172,7 @@ class Screen:
         if size is None:
             raise ValueError('Font size is required for all non-default fonts')
 
-        if name in self._cached_fonts.keys():
+        if unique_name in self._cached_fonts.keys():
             self._current_font = self._cached_fonts[unique_name]
             return True
         else:
@@ -201,8 +196,8 @@ class Screen:
                 self._cached_fonts.update({unique_name: self._current_font})
                 return True
             except OSError:
-                self.LOG.debug(f'failed to load font "{name}" from '
-                               f'"{self._fonts_dir}"')
+                self.LOG.warning(f'failed to load font "{name}" from '
+                                 f'"{self._fonts_dir}"')
 
         return False
 
@@ -289,6 +284,7 @@ class Screen:
     @public
     def clear(self):
         self.fill(0, None)
+        self.LOG.info('cleared screen')
 
     @public
     def write_file(self, filename: str):
@@ -300,5 +296,5 @@ class Screen:
 
     @public
     def reset_frame_count(self):
-        self.LOG.info('frame counter reset')
         self._frame_count = 1
+        self.LOG.info('frame counter reset')

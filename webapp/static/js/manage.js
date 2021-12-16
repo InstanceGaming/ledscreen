@@ -31,8 +31,10 @@ $(document).ajaxError(function( event, jqxhr, settings, thrownError ) {
     {
         alert(`
         An XHR error occurred.
+
+        If you powered off the screen, you can ignore this message and close this browser tab, otherwise...
         Check your network connection, refresh and try again.
-        If the error persists, contact Jacob.\n
+        If the error persists, contact Jacob.
         Response code: ${jqxhr.status} ${jqxhr.statusText}
         Endpoint: ${settings.type} ${settings.url}`);
     }
@@ -66,7 +68,7 @@ function filter_status_response(jqXHR, success)
 const POST_RESTART_ENDPOINT = "/api/system/restart";
 const POST_POWEROFF_ENDPOINT = "/api/system/poweroff";
 const POST_START_PROGRAM = "/api/pluggram/{0}/run";
-const POST_STOP_PROGRAM = "/api/pluggrams/stop";
+const POST_STOP_PROGRAM = "/api/pluggrams/stop?clear=1";
 const POST_RUNNING_PROGRAM = "/api/pluggrams/running";
 const POST_PROGRAM_OPTIONS = "/api/pluggram/{0}/options";
 let presumed_dead = false;
@@ -81,13 +83,15 @@ function restart() {
                     presumed_dead = true;
                     iziToast.show({
                         title: 'Restarting...',
-                        message: 'This page will automatically reload in 30 seconds.',
+                        message: 'This page will automatically reload in 60 seconds.',
                         position: 'center',
                         drag: false,
                         close: false,
+                        overlay: true,
+                        overlayClose: false,
                         icon: 'bi bi-arrow-repeat',
                         backgroundColor: '#dda458',
-                        timeout: 30000,
+                        timeout: 60000,
                         layout: 2,
                         displayMode: 'replace',
                         onClosing: function () {
@@ -102,6 +106,8 @@ function restart() {
                         message: 'The system refused to restart, please try again.',
                         position: 'center',
                         drag: false,
+                        overlay: true,
+                        overlayClose: true,
                         icon: 'bi bi-x-lg',
                         backgroundColor: '#dda458',
                         layout: 2,
@@ -130,6 +136,8 @@ function poweroff() {
                         close: false,
                         theme: 'dark',
                         backgroundColor: '#dd5858',
+                        overlay: true,
+                        overlayClose: false,
                         layout: 2,
                         icon: 'bi bi-power',
                         displayMode: 'replace',
@@ -146,6 +154,8 @@ function poweroff() {
                         title: 'Shutting down?',
                         message: 'The system refused to shutdown, please try again.',
                         drag: false,
+                        overlay: true,
+                        overlayClose: true,
                         theme: 'dark',
                         backgroundColor: '#dd5858',
                         layout: 2,
@@ -317,12 +327,15 @@ function update_play_stop_btns()
 
 function poll_running_program()
 {
-    $.get(POST_RUNNING_PROGRAM, function(data, textStatus, jqXHR){
-        filter_status_response(jqXHR, function() {
-            running_program_name = data["name"];
-            update_play_stop_btns();
+    if (!presumed_dead)
+    {
+        $.get(POST_RUNNING_PROGRAM, function(data, textStatus, jqXHR){
+            filter_status_response(jqXHR, function() {
+                running_program_name = data["name"];
+                update_play_stop_btns();
+            });
         });
-    });
+    }
 }
 
 function set_play_stop_btn(program_name, running, disabled)
@@ -350,14 +363,11 @@ function start_stop_clicked(program_name)
     const btn = play_stop_map[program_name];
     btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
 
-    poll_running_program();
-
     if (program_name == running_program_name)
     {
         $.post(POST_STOP_PROGRAM, function(data, textStatus, jqXHR){
             filter_status_response(jqXHR, function() {
                 console.log(`stopped ${program_name}`);
-                poll_running_program();
             });
         });
     }
@@ -369,11 +379,12 @@ function start_stop_clicked(program_name)
             $.post(path, function(data, textStatus, jqXHR){
                 filter_status_response(jqXHR, function() {
                     console.log(`started ${program_name}`);
-                    poll_running_program();
                 });
             });
         }
     }
+
+    setTimeout(poll_running_program, 250);
 }
 
 for (const pb of play_stop_btns)
@@ -386,3 +397,4 @@ for (const pb of play_stop_btns)
 }
 
 poll_running_program();
+setInterval(poll_running_program, 5000);
